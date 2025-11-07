@@ -11,7 +11,7 @@ from .data_structures import *
 
 # 默认插件实现基类
 class EventUnderstandingPlugin:
-    def understandEvent(self, raw_event: UnderstandEventInput) -> Dict:
+    def understand_event(self, raw_event: UnderstandEventInput) -> Dict:
         # 事件理解
         return UnderstoodData
 

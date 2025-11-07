@@ -103,6 +103,13 @@ class EmotionalState(Enum):
     CURIOUS = "curious"
 
 
+class CoreStatus(Enum):
+    AWAITING = "awaiting"
+    AWARE = "aware"
+    WINDING_DOWN = "winding_down"
+    DREAMING = "dreaming"
+
+
 @dataclass
 class EpisodicMemory:
     episodic_memories: Dict[str, EpisodicMemoriesModels]  # 记忆片段列表
