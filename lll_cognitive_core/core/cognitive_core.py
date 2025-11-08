@@ -14,6 +14,7 @@ from lll_simple_ai_shared import (
 import queue
 import logging
 
+from ..config.cognitive_core_config import CognitiveCoreConfig
 from .cache_memory_manager import CacheMemoryManager
 from .data_structures import *
 from .plugin_interfaces import (
@@ -30,9 +31,7 @@ class CognitiveCore:
     负责协调所有AI插件，维护记忆系统，生成智能行为
     """
 
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-
+    def __init__(self, config: CognitiveCoreConfig = None):
         # 运行时记忆
         self.working_memory = WorkingMemory()
 
@@ -48,9 +47,10 @@ class CognitiveCore:
         }
 
         # 超过多少条历史记忆就使用专门的回想任务处理
-        self.episodic_memories_direct_threshold = config.get(
-            "episodic_memories_direct_threshold", 5
+        self.episodic_memories_direct_threshold = (
+            config.episodic_memories_direct_threshold or 5
         )
+        self.max_processed_count_on_loop = config.max_processed_count_on_loop or 10
 
         # 事件处理系统
         self.event_queue = queue.Queue()
@@ -105,11 +105,7 @@ class CognitiveCore:
             raw_type = raw_event.get("type", "")
             raw_data = raw_event.get("data", "")
 
-            if raw_type == "wake_up":
-                self.wake_up()
-            elif raw_type == "sleep":
-                self.sleep()
-            elif raw_type and raw_data:
+            if self.status == CoreStatus.AWARE and raw_type and raw_data:
                 event_with_context = UnderstandEventData(
                     type=raw_type,
                     data=raw_data,
@@ -154,7 +150,8 @@ class CognitiveCore:
         start_time = time.time()
 
         while (
-            not self.event_queue.empty() and processed_count < 10
+            not self.event_queue.empty()
+            and processed_count < self.max_processed_count_on_loop
         ):  # 每轮最多处理10个事件
             try:
                 event_data: UnderstandEventData = self.event_queue.get_nowait()

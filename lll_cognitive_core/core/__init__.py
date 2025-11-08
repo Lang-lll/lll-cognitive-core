@@ -4,10 +4,12 @@ from .plugin_interfaces import (
     BehaviorGenerationPlugin,
     MemoryManagerPlugin,
 )
+from .data_structures import CoreStatus
 
 __all__ = [
     "CacheMemoryManager",
     "AssociativeRecallPlugin",
     "BehaviorGenerationPlugin",
     "MemoryManagerPlugin",
+    "CoreStatus",
 ]
