@@ -15,7 +15,7 @@ def create_cognitive_app(config: CognitiveCoreConfig = None):
 
     @app.route("/get-system-status", methods=["GET"])
     def get_system_status():
-        return jsonify(cognitive_core.get_system_status())
+        return jsonify({"success": True, "data": cognitive_core.get_system_status()})
 
     @app.route("/receive-event", methods=["POST"])
     def receive_event():
