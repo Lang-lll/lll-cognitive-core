@@ -1,1 +1,2 @@
-lll-simple-ai-shared==0.1.3
+openai==2.7.1
+lll-simple-ai-shared==0.1.4

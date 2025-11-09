@@ -115,3 +115,8 @@ class CacheMemoryManager(MemoryManagerPlugin):
             end_date = datetime.now().date()
 
         return start_date, end_date
+
+    def clear(self):
+        self.episodic_memory.episodic_memories.clear()
+        self.episodic_memory.keyword_index.clear()
+        self.episodic_memory.time_index.clear()

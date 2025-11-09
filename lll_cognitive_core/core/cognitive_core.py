@@ -1,5 +1,6 @@
 import time
 import threading
+from datetime import datetime
 from typing import Dict, Optional, Any
 from lll_simple_ai_shared import (
     UnderstoodData,
@@ -13,9 +14,11 @@ from lll_simple_ai_shared import (
 import queue
 import logging
 
+from ..config.cognitive_core_config import CognitiveCoreConfig
 from .cache_memory_manager import CacheMemoryManager
 from .data_structures import *
 from .plugin_interfaces import (
+    EventUnderstandingPlugin,
     AssociativeRecallPlugin,
     BehaviorGenerationPlugin,
     MemoryManagerPlugin,
@@ -28,9 +31,7 @@ class CognitiveCore:
     负责协调所有AI插件，维护记忆系统，生成智能行为
     """
 
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {}
-
+    def __init__(self, config: CognitiveCoreConfig = None):
         # 运行时记忆
         self.working_memory = WorkingMemory()
 
@@ -45,17 +46,15 @@ class CognitiveCore:
             "memory_manager": None,
         }
 
-        self.last_deep_consolidation = time.time()
-        self.last_light_consolidation = time.time()
-
         # 超过多少条历史记忆就使用专门的回想任务处理
-        self.episodic_memories_direct_threshold = config.get(
-            "episodic_memories_direct_threshold", 5
+        self.episodic_memories_direct_threshold = (
+            config.episodic_memories_direct_threshold or 5
         )
+        self.max_processed_count_on_loop = config.max_processed_count_on_loop or 10
 
         # 事件处理系统
         self.event_queue = queue.Queue()
-        self.is_running = False
+        self.status: CoreStatus = CoreStatus.AWAITING
         self.processing_thread = None
 
         # 统计信息
@@ -63,7 +62,8 @@ class CognitiveCore:
             "events_processed": 0,
             "memory_consolidations": 0,
             "average_processing_time": 0.0,
-            "last_consolidation_time": time.time(),
+            "last_deep_consolidation": time.time(),
+            "last_light_consolidation": time.time(),
         }
 
         self.logger = logging.getLogger("CognitiveCore")
@@ -77,53 +77,57 @@ class CognitiveCore:
             self.logger.error(f"未知插件类型: {plugin_type}")
 
     def get_plugin(self, plugin_type: str):
-        """获取插件实例（回退到默认实现）"""
+        """获取插件实例"""
         return self.plugins.get(plugin_type)
 
-    def start(self):
-        if self.is_running:
+    def wake_up(self):
+        if self.status != CoreStatus.AWAITING:
             return
 
         """启动认知核心"""
-        self.is_running = True
+        self.status = CoreStatus.AWARE
         self.processing_thread = threading.Thread(
             target=self._processing_loop, daemon=True
         )
         self.processing_thread.start()
         self.logger.info("CognitiveCore 启动成功")
 
-    def stop(self):
+    def sleep(self):
         """停止认知核心"""
-        self.is_running = False
-        if self.processing_thread:
-            self.processing_thread.join(timeout=5.0)
-        self.logger.info("CognitiveCore 已停止")
+        if self.status != CoreStatus.AWARE:
+            return
+
+        self.status = CoreStatus.WINDING_DOWN
 
     def receive_event(self, raw_event: Dict[str, str]):
-        """接收来自AI模块的原始事件"""
+        """接收事件"""
         try:
-            event_with_context = UnderstandEventData(
-                type=raw_event.get("type", ""),
-                data=raw_event.get("data", ""),
-                source=raw_event.get("source", ""),
-                timestamp=time.time(),
-            )
-            self.event_queue.put(event_with_context)
+            raw_type = raw_event.get("type", "")
+            raw_data = raw_event.get("data", "")
+
+            if self.status == CoreStatus.AWARE and raw_type and raw_data:
+                event_with_context = UnderstandEventData(
+                    type=raw_type,
+                    data=raw_data,
+                    source=raw_event.get("source", ""),
+                    timestamp=time.time(),
+                )
+                self.event_queue.put(event_with_context)
         except Exception as e:
             self.logger.error(f"接收事件失败: {e}")
 
     def _processing_loop(self):
         """主处理循环"""
-        while self.is_running:
+        while self.status == CoreStatus.AWARE:
             try:
                 # 处理事件队列
                 self._process_events()
 
-                # 检查记忆整理条件
-                self._check_memory_consolidation()
-
                 # 更新系统状态
                 self._update_system_state()
+
+                # 检测是否进入睡眠
+                self._check_sleep()
 
                 time.sleep(0.02)  # 避免CPU过度占用
 
@@ -131,13 +135,23 @@ class CognitiveCore:
                 self.logger.error(f"处理循环错误: {e}")
                 time.sleep(0.1)
 
+    def _check_sleep(self):
+        if self.status == CoreStatus.WINDING_DOWN and self.event_queue.empty():
+
+            if self.processing_thread:
+                self.processing_thread.join(timeout=5.0)
+            self.logger.info("CognitiveCore 开始整理信息")
+
+            self._consolidate_memories("deep")
+
     def _process_events(self):
         """处理事件队列"""
         processed_count = 0
         start_time = time.time()
 
         while (
-            not self.event_queue.empty() and processed_count < 10
+            not self.event_queue.empty()
+            and processed_count < self.max_processed_count_on_loop
         ):  # 每轮最多处理10个事件
             try:
                 event_data: UnderstandEventData = self.event_queue.get_nowait()
@@ -172,7 +186,7 @@ class CognitiveCore:
             self._update_working_memory(event_data, understood_data)
 
             # 行为生成和执行
-            self._generate_and_execute_behavior()
+            self._generate_and_execute_behavior(understood_data)
 
             processing_time = time.time() - start_time
             self.logger.debug(
@@ -186,7 +200,7 @@ class CognitiveCore:
         self, event_data: UnderstandEventData
     ) -> Optional[Dict[str, Any]]:
         """事件理解阶段"""
-        plugin = self.get_plugin("event_understanding")
+        plugin: EventUnderstandingPlugin = self.get_plugin("event_understanding")
         if not plugin:
             return None
 
@@ -220,11 +234,9 @@ class CognitiveCore:
 
         # 添加到最近事件
         self.working_memory.recent_events.append(cognitive_event)
-        # if len(self.working_memory.recent_events) > 50:
-        #     self.working_memory.recent_events.pop(0)
 
         # 更新当前情境
-        situation = understood_data.get("current_situation", None)
+        situation = understood_data.current_situation or None
         if situation is not None:
             self.working_memory.current_situation = situation
 
@@ -359,22 +371,22 @@ class CognitiveCore:
         # 基于事件数量、目标复杂度等计算认知负荷
         event_count = len(self.working_memory.recent_events)
         goal_complexity = len(self.working_memory.active_goals)
-        memory_usage = len(self.working_memory.recent_events) / 50.0
-
-        self.working_memory.cognitive_load = min(
-            1.0, event_count * 0.02 + goal_complexity * 0.1 + memory_usage * 0.3
+        memory_cache = len(
+            self.episodic_memory_manager.episodic_memory.episodic_memories
         )
 
-    def _check_memory_consolidation(self):
-        """检查记忆整理条件"""
-        pass
+        self.working_memory.cognitive_load = min(
+            1.0, event_count * 0.02 + goal_complexity * 0.1 + memory_cache * 0.01
+        )
 
     def _consolidate_memories(self, consolidation_type: str):
         """执行记忆整理"""
+        self.status = CoreStatus.DREAMING
+
         # 获取记忆提取插件
         extraction_plugin = self.get_plugin("memory_extraction")
 
-        if not extraction_plugin or not extraction_plugin:
+        if extraction_plugin is None:
             return
 
         try:
@@ -428,15 +440,15 @@ class CognitiveCore:
                 # 保存到文件
                 memory_manager.save_episodic_memories(result)
 
-            # TODO: 清理self.episodic_memory_manager
-
             self._apply_consolidation_result(consolidation_type)
+
+            self.status = CoreStatus.AWAITING
 
             # 更新整理时间
             if consolidation_type == "deep":
-                self.last_deep_consolidation = time.time()
+                self.stats["last_deep_consolidation"] = time.time()
             else:
-                self.last_light_consolidation = time.time()
+                self.stats["last_light_consolidation"] = time.time()
 
             self.stats["memory_consolidations"] += 1
             self.logger.info(f"{consolidation_type}记忆整理完成")
@@ -445,24 +457,26 @@ class CognitiveCore:
             self.logger.error(f"记忆整理错误: {e}")
 
     def _apply_consolidation_result(self, mode: str):
-        """应用记忆整理结果 - 多模式支持"""
-        if mode == "light":
-            self._light_consolidation()
-        elif mode == "deep":
+        """应用记忆整理结果"""
+        if mode == "deep":
             self._deep_consolidation()
+        else:
+            self._light_consolidation()
 
     def _light_consolidation(self):
         """浅度整理"""
 
         # 轻度清理工作记忆
         self.working_memory.recent_events = self.working_memory.recent_events[-25:]
+        self._update_cognitive_load()
 
     def _deep_consolidation(self):
-        """深度整理 - 包含存储逻辑"""
+        """深度整理"""
 
         # 深度清理工作记忆
-        self.working_memory.recent_events = self.working_memory.recent_events[-10:]
-        self.working_memory.cognitive_load = 0.1
+        self.working_memory.recent_events.clear()
+        self.episodic_memory_manager.clear()
+        self._update_cognitive_load()
 
     def _cleanup_expired_memories(self):
         """清理过期记忆"""
@@ -486,20 +500,22 @@ class CognitiveCore:
             ]  # 限制缓存大小"""
 
     def _update_system_state(self):
-        """更新系统状态 - 包含存储检查"""
-        current_time = time.time()
+        """更新系统状态"""
+        """current_time = time.time()
 
         # 清理过期记忆
         if current_time - self.stats.get("last_cleanup_time", 0) > 60:
             self._cleanup_expired_memories()
-            self.stats["last_cleanup_time"] = current_time
+            self.stats["last_cleanup_time"] = current_time"""
 
     def get_system_status(self) -> Dict[str, Any]:
         """获取系统状态"""
         return {
-            "is_running": self.is_running,
+            "status": self.status,
             "cognitive_load": self.working_memory.cognitive_load,
             "working_memory_usage": len(self.working_memory.recent_events),
-            # "episodic_memory_usage": len(self.episodic_memory.episodic_memories),
+            "episodic_memory_usage": len(
+                self.episodic_memory_manager.episodic_memory.episodic_memories
+            ),
             "processing_stats": self.stats,
         }
