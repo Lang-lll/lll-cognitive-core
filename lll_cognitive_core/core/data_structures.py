@@ -3,7 +3,9 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from openai import OpenAI
 from lll_simple_ai_shared import UnderstoodData, EpisodicMemoriesModels
+from ..config.create_openai_config import CreateOpenaiConfig
 
 
 class UnderstandEventData(BaseModel):
@@ -177,3 +179,10 @@ class Goal:
     success_criteria: List[str]  # 成功标准
     created_time: float
     deadline: Optional[float]  # 截止时间
+
+
+@dataclass
+class DefaultPluginInitOptions:
+    client: OpenAI
+    config: CreateOpenaiConfig
+    input_template: str

@@ -242,7 +242,12 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         return memories
 
     def load_time_index(self) -> Dict:
-        return self.load_generic_index("memory/index/time_index.json")
+        time_index = self.load_generic_index("memory/index/time_index.json")
+
+        if time_index.get("indexed_dates", None) is None:
+            return {"indexed_dates": {}}
+
+        return time_index
 
     def save_time_index(self, time_index: Dict):
         self.save_generic_index("memory/index/time_index.json", time_index)

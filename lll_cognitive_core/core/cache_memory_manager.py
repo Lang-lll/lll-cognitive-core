@@ -7,7 +7,9 @@ from .plugin_interfaces import MemoryManagerPlugin
 
 class CacheMemoryManager(MemoryManagerPlugin):
     def __init__(self):
-        self.episodic_memory = EpisodicMemory()
+        self.episodic_memory = EpisodicMemory(
+            episodic_memories={}, keyword_index={}, time_index={}
+        )
 
     def query_episodic_memories(
         self, date_range, importance_min=0, keywords=None, associations=None
@@ -24,9 +26,10 @@ class CacheMemoryManager(MemoryManagerPlugin):
             time_index = self.episodic_memory.time_index
             keyword_index = self.episodic_memory.keyword_index
 
-            idList: List[str] = []
-            episodic_memories: List[EpisodicMemoriesModels] = []
+            # 初始化候选ID集合
+            candidate_ids = set()
 
+            # 按时间范围筛选
             for date_str, dateIdList in time_index.items():
                 current_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
@@ -34,16 +37,30 @@ class CacheMemoryManager(MemoryManagerPlugin):
                 if not (start_date <= current_date <= end_date):
                     continue
 
-                idList.extend(dateIdList)
+                # 添加时间范围内的所有ID
+                candidate_ids.update(dateIdList)
 
-            if keywords is not None:
-                for keyword, keywordIdList in keyword_index.items():
-                    if keyword in keywords:
-                        idList = list(dict.fromkeys(idList + keywordIdList))
+            # 如果有关键词，进行交集过滤
+            if keywords and candidate_ids:
+                keyword_ids_set = set()
 
-            for id in idList:
-                memory = self.episodic_memory.episodic_memories.get(id, None)
-                if memory is not None:
+                # 收集所有匹配关键词的ID
+                for keyword in keywords:
+                    if keyword in keyword_index:
+                        keyword_ids_set.update(keyword_index[keyword])
+
+                # 取时间范围和关键词的交集
+                if keyword_ids_set:
+                    candidate_ids = candidate_ids.intersection(keyword_ids_set)
+                else:
+                    # 如果有关键词但没有匹配的，返回空结果
+                    candidate_ids = set()
+
+            # 获取记忆详情并过滤重要性
+            episodic_memories: List[EpisodicMemoriesModels] = []
+            for memory_id in candidate_ids:
+                memory = self.episodic_memory.episodic_memories.get(memory_id, None)
+                if memory is not None and memory.importance >= importance_min:
                     episodic_memories.append(memory)
 
             return episodic_memories

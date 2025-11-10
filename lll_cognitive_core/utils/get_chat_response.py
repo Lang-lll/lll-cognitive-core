@@ -24,19 +24,17 @@ def get_chat_response(data: GetChatResponseInput):
             response = data.client.chat.completions.create(
                 model=data.config.model,
                 messages=list(
-                    dict.fromkeys(
-                        pre_messages
-                        + [
-                            {
-                                "role": "system",
-                                "content": generate_template_prompt(
-                                    data.input_template,
-                                    data.format_inputs_func,
-                                    data.inputs,
-                                ),
-                            }
-                        ]
-                    )
+                    pre_messages
+                    + [
+                        {
+                            "role": "system",
+                            "content": generate_template_prompt(
+                                data.input_template,
+                                data.format_inputs_func,
+                                data.inputs,
+                            ),
+                        }
+                    ]
                 ),
                 response_format={"type": "json_object"},
             )

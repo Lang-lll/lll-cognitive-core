@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lll-cognitive-core"
+version = "0.1.0"
+description = "A cognitive core system for AI agents with memory and reasoning"
+requires-python = ">=3.8"
+dependencies = [
+  "openai==2.7.1",
+  "lll-simple-ai-shared==0.1.4",
+  "pytest>=7.0",
+  "pytest-cov",
+  "pytest-mock"
+]
+
+[tool.setuptools]
+packages = {find = {where = ["."], include = ["lll_cognitive_core", "lll_cognitive_core.*"]}}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["lll_cognitive_core"]
+addopts = "-v --cov=lll_cognitive_core --cov-report=html"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "pytest-mock"
+]
