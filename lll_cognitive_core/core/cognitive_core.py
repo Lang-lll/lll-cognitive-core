@@ -21,6 +21,7 @@ from .plugin_interfaces import (
     EventUnderstandingPlugin,
     AssociativeRecallPlugin,
     BehaviorGenerationPlugin,
+    MemoryExtractionPlugin,
     MemoryManagerPlugin,
 )
 
@@ -33,7 +34,14 @@ class CognitiveCore:
 
     def __init__(self, config: CognitiveCoreConfig = None):
         # 运行时记忆
-        self.working_memory = WorkingMemory()
+        self.working_memory = WorkingMemory(
+            current_situation="",
+            active_goals=[],
+            recent_events=[],
+            cognitive_load=0,
+            last_update_time=time.time(),
+            active_duration=0,
+        )
 
         self.episodic_memory_manager = CacheMemoryManager()  # 活跃情景记忆缓存
 
@@ -340,31 +348,37 @@ class CognitiveCore:
 
     def _execute_behavior_plan(self, behavior_plan: BehaviorPlan):
         """执行行为计划"""
-        if not behavior_plan or "plan" not in behavior_plan:
-            return
+        try:
+            if not behavior_plan or not behavior_plan.plan:
+                return
 
-        # 这里应该通过Orchestrator发送到对应的AI模块
-        for action in behavior_plan.plan:
-            self.logger.info(f"执行行为: {action}")
-            self._update_working_memory(
-                UnderstandEventData(
-                    type=action.type,
-                    data=action.data,
-                    source="me",
-                    timestamp=time.time(),
-                ),
-                UnderstoodData(
-                    event_type="my_action",
-                    confidence=1.0,
-                    response_priority="medium",
-                    expected_response="none",
-                    main_content=action.data,
-                    event_entity="me",
-                    key_entities=[],
-                    importance_score=50,
-                ),
-            )
-            # TODO: 通过HTTP发送到Orchestrator
+            if behavior_plan.current_situation:
+                self.working_memory.current_situation = behavior_plan.current_situation
+
+            # 这里应该通过Orchestrator发送到对应的AI模块
+            for action in behavior_plan.plan:
+                self.logger.info(f"执行行为: {action}")
+                self._update_working_memory(
+                    UnderstandEventData(
+                        type=action.type,
+                        data=action.data,
+                        source="me",
+                        timestamp=time.time(),
+                    ),
+                    UnderstoodData(
+                        response_priority="medium",
+                        expected_response="none",
+                        main_content=action.data,
+                        current_situation=None,
+                        event_entity="me",
+                        key_entities=[],
+                        importance_score=50,
+                        memory_query_plan=None,
+                    ),
+                )
+                # TODO: 通过HTTP发送到Orchestrator
+        except Exception as e:
+            self.logger.error(f"执行行为计划: {e}")
 
     def _update_cognitive_load(self):
         """更新认知负荷"""
@@ -384,7 +398,7 @@ class CognitiveCore:
         self.status = CoreStatus.DREAMING
 
         # 获取记忆提取插件
-        extraction_plugin = self.get_plugin("memory_extraction")
+        extraction_plugin: MemoryExtractionPlugin = self.get_plugin("memory_extraction")
 
         if extraction_plugin is None:
             return

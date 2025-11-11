@@ -52,7 +52,7 @@ class MemoryManagerPlugin:
 
     def query_episodic_memories(
         self,
-        date_range: Optional[List[str]],
+        date_range: Optional[List[int | str]],
         importance_min: Optional[int],
         keywords: Optional[List[str]],
         associations: Optional[List[str]],

@@ -1,5 +1,5 @@
 openai==2.7.1
-lll-simple-ai-shared==0.1.4
+lll-simple-ai-shared==0.1.6
 pytest>=7.0
 pytest-cov
 pytest-mock

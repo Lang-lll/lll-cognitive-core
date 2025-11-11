@@ -1,5 +1,5 @@
 from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from lll_simple_ai_shared import EpisodicMemoriesModels
 from .data_structures import EpisodicMemory
 from .plugin_interfaces import MemoryManagerPlugin
@@ -122,14 +122,41 @@ class CacheMemoryManager(MemoryManagerPlugin):
 
     def parse_date_range(self, date_range):
         """解析时间范围，支持多种格式"""
+
+        # 默认返回今天
+        start_date = datetime.now().date()
+        end_date = datetime.now().date()
         if isinstance(date_range, list) and len(date_range) == 2:
-            # [起始日期, 结束日期] 格式
-            start_date = datetime.strptime(date_range[0], "%Y-%m-%d").date()
-            end_date = datetime.strptime(date_range[1], "%Y-%m-%d").date()
-        else:
-            # 默认返回今天
-            start_date = datetime.now().date()
-            end_date = datetime.now().date()
+            # 判断元素类型来决定处理方式
+            start_item = date_range[0]
+            end_item = date_range[1]
+
+            if isinstance(start_item, int) and isinstance(end_item, int):
+                # 格式1: [起始天数, 结束天数] 如 [0, 7] 表示最近7天
+                end_days = start_item  # 距离今天的天数（结束日期）
+                start_days = end_item  # 距离今天的天数（开始日期）
+
+                # 计算具体日期
+                end_date = datetime.now().date() - timedelta(days=end_days)
+                start_date = datetime.now().date() - timedelta(days=start_days)
+
+            elif isinstance(start_item, str) and isinstance(end_item, str):
+                # 格式2: ["YYYY-MM-DD", "YYYY-MM-DD"] 具体日期格式
+                try:
+                    start_date = datetime.strptime(start_item, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_item, "%Y-%m-%d").date()
+                except ValueError:
+                    # 日期格式解析失败，返回今天
+                    start_date = datetime.now().date()
+                    end_date = datetime.now().date()
+            else:
+                # 混合类型或其他情况，返回今天
+                start_date = datetime.now().date()
+                end_date = datetime.now().date()
+
+            # 确保开始日期不晚于结束日期
+            if start_date > end_date:
+                start_date, end_date = end_date, start_date
 
         return start_date, end_date
 
