@@ -1,7 +1,7 @@
 import time
 import threading
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Literal, Dict, Optional, Any
 from lll_simple_ai_shared import (
     UnderstoodData,
     RecallResultsModels,
@@ -25,6 +25,15 @@ from .plugin_interfaces import (
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
 )
+
+PluginType = Literal[
+    "event_understanding",
+    "associative_recall",
+    "behavior_generation",
+    "behavior_execution",
+    "memory_extraction",
+    "memory_manager",
+]
 
 
 class CognitiveCore:
@@ -78,7 +87,7 @@ class CognitiveCore:
 
         self.logger = logging.getLogger("CognitiveCore")
 
-    def register_plugin(self, plugin_type: str, plugin_instance):
+    def register_plugin(self, plugin_type: PluginType, plugin_instance):
         """注册自定义插件"""
         if plugin_type in self.plugins:
             self.plugins[plugin_type] = plugin_instance

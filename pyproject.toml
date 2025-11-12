@@ -9,7 +9,7 @@ description = "A cognitive core system for AI agents with memory and reasoning"
 requires-python = ">=3.8"
 dependencies = [
   "openai==2.7.1",
-  "lll-simple-ai-shared==0.1.6",
+  "lll-simple-ai-shared==0.1.8",
   "pytest>=7.0",
   "pytest-cov",
   "pytest-mock"
@@ -30,3 +30,6 @@ test = [
     "pytest-cov",
     "pytest-mock"
 ]
+
+[tool.taskipy.tasks]
+dev = "python scripts/my_service.py"

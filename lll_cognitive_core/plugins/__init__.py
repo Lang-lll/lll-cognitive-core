@@ -7,6 +7,10 @@ from .cognitive_core_plugin_default_associative_recall import (
 from .cognitive_core_plugin_default_behavior_generation import (
     CognitiveCorePluginDefaultBehaviorGeneration,
 )
+from .cognitive_core_plugin_default_behavior_execution import (
+    CognitiveCorePluginDefaultBehaviorExecution,
+    CognitiveCorePluginDefaultBehaviorExecutionOptions,
+)
 from .cognitive_core_plugin_default_memory_extraction import (
     CognitiveCorePluginDefaultMemoryExtraction,
 )
@@ -18,6 +22,8 @@ __all__ = [
     "CognitiveCorePluginDefaultEventUnderstanding",
     "CognitiveCorePluginDefaultAssociativeRecall",
     "CognitiveCorePluginDefaultBehaviorGeneration",
+    "CognitiveCorePluginDefaultBehaviorExecution",
+    "CognitiveCorePluginDefaultBehaviorExecutionOptions",
     "CognitiveCorePluginDefaultMemoryExtraction",
     "CognitiveCorePluginDefaultMemoryManager",
 ]

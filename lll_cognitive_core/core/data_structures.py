@@ -185,4 +185,4 @@ class Goal:
 class DefaultPluginInitOptions:
     client: OpenAI
     config: CreateOpenaiConfig
-    input_template: str
+    add_messages: Optional[List[Dict[str, str]]] = None

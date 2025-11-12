@@ -1,5 +1,6 @@
 from lll_simple_ai_shared import (
     RecallResultsModels,
+    associative_recall_system_template,
     associative_recall_task_format_inputs,
 )
 from ..core.data_structures import DefaultPluginInitOptions, AssociativeRecallInput
@@ -18,8 +19,9 @@ class CognitiveCorePluginDefaultAssociativeRecall:
             GetChatResponseInput(
                 client=self._options.client,
                 config=self._options.config,
-                input_template=self._options.input_template,
+                input_template=associative_recall_system_template,
                 format_inputs_func=associative_recall_task_format_inputs,
+                add_messages=self._options.add_messages,
                 inputs=raw_event,
                 data_model=RecallResultsModels,
             )

@@ -1,5 +1,6 @@
 from lll_simple_ai_shared import (
     EpisodicMemoriesGenerateModels,
+    extract_memories_system_template,
     extract_memories_task_format_inputs,
 )
 from ..core.data_structures import DefaultPluginInitOptions, ExtractMemoriesInput
@@ -18,8 +19,9 @@ class CognitiveCorePluginDefaultMemoryExtraction:
             GetChatResponseInput(
                 client=self._options.client,
                 config=self._options.config,
-                input_template=self._options.input_template,
+                input_template=extract_memories_system_template,
                 format_inputs_func=extract_memories_task_format_inputs,
+                add_messages=self._options.add_messages,
                 inputs=raw_event,
                 data_model=EpisodicMemoriesGenerateModels,
             )

@@ -38,4 +38,4 @@ def create_cognitive_app(config: CognitiveCoreConfig = None):
 
         return jsonify({"success": True})
 
-    return app
+    return app, cognitive_core

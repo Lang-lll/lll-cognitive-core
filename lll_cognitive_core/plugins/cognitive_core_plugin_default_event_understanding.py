@@ -1,4 +1,8 @@
-from lll_simple_ai_shared import UnderstoodData, understand_task_format_inputs
+from lll_simple_ai_shared import (
+    UnderstoodData,
+    understand_system_template,
+    understand_task_format_inputs,
+)
 from ..core.data_structures import DefaultPluginInitOptions, UnderstandEventInput
 from ..utils.get_chat_response import GetChatResponseInput, get_chat_response
 
@@ -15,8 +19,9 @@ class CognitiveCorePluginDefaultEventUnderstanding:
             GetChatResponseInput(
                 client=self._options.client,
                 config=self._options.config,
-                input_template=self._options.input_template,
+                input_template=understand_system_template,
                 format_inputs_func=understand_task_format_inputs,
+                add_messages=self._options.add_messages,
                 inputs=raw_event,
                 data_model=UnderstoodData,
             )

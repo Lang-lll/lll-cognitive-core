@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.env
 env/
 venv/
 .venv/
@@ -29,6 +30,7 @@ Thumbs.db
 # models
 /models
 
+/scripts
 */scripts
 
 # Distribution / packaging

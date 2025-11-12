@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from openai import OpenAI
 from ..config.create_openai_config import CreateOpenaiConfig
@@ -14,6 +14,7 @@ class GetChatResponseInput:
     format_inputs_func: Any
     inputs: Dict[str, Any]
     data_model: BaseModel
+    add_messages: Optional[List[Dict[str, str]]] = None
 
 
 def get_chat_response(data: GetChatResponseInput):
@@ -35,6 +36,7 @@ def get_chat_response(data: GetChatResponseInput):
                             ),
                         }
                     ]
+                    + (data.add_messages or [])
                 ),
                 response_format={"type": "json_object"},
             )

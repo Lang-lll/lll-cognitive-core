@@ -7,7 +7,7 @@ from ..core.plugin_interfaces import BehaviorExecutionPlugin
 
 
 @dataclass
-class DefaultBehaviorExecutionInitOptions:
+class CognitiveCorePluginDefaultBehaviorExecutionOptions:
     protocol: str
     host: str
     port: int
@@ -20,8 +20,8 @@ class DefaultBehaviorExecutionInitOptions:
 
 
 class CognitiveCorePluginDefaultBehaviorExecution(BehaviorExecutionPlugin):
-    def __init__(self, options: DefaultBehaviorExecutionInitOptions):
-        self._options = options or DefaultBehaviorExecutionInitOptions()
+    def __init__(self, options: CognitiveCorePluginDefaultBehaviorExecutionOptions):
+        self._options = options or CognitiveCorePluginDefaultBehaviorExecutionOptions()
 
     def execute_behavior_plan(self, action: Any):
         """
