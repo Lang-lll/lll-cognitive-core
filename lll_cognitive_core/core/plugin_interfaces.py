@@ -26,6 +26,11 @@ class BehaviorGenerationPlugin:
         return BehaviorPlan
 
 
+class BehaviorExecutionPlugin:
+    def execute_behavior_plan(self, action: Any):
+        pass
+
+
 class MemoryExtractionPlugin:
     """记忆提取插件基类 - 只定义与CognitiveCore交互的接口"""
 

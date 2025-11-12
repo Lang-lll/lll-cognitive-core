@@ -21,6 +21,7 @@ from .plugin_interfaces import (
     EventUnderstandingPlugin,
     AssociativeRecallPlugin,
     BehaviorGenerationPlugin,
+    BehaviorExecutionPlugin,
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
 )
@@ -50,6 +51,7 @@ class CognitiveCore:
             "event_understanding": None,
             "associative_recall": None,
             "behavior_generation": None,
+            "behavior_execution": None,
             "memory_extraction": None,
             "memory_manager": None,
         }
@@ -352,6 +354,13 @@ class CognitiveCore:
             if not behavior_plan or not behavior_plan.plan:
                 return
 
+            behavior_execution: BehaviorExecutionPlugin = self.get_plugin(
+                "behavior_execution"
+            )
+
+            if not behavior_execution:
+                return
+
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
 
@@ -376,7 +385,8 @@ class CognitiveCore:
                         memory_query_plan=None,
                     ),
                 )
-                # TODO: 通过HTTP发送到Orchestrator
+
+                behavior_execution.execute_behavior_plan(action)
         except Exception as e:
             self.logger.error(f"执行行为计划: {e}")
 
