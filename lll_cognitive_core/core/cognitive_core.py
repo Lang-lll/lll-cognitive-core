@@ -6,13 +6,11 @@ from lll_simple_ai_shared import (
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
-    MemoryQueryType,
     EpisodicMemoriesModels,
     EpisodicMemoriesGenerateModels,
 )
 
 import queue
-import logging
 
 from ..config.cognitive_core_config import CognitiveCoreConfig
 from .cache_memory_manager import CacheMemoryManager
@@ -25,6 +23,7 @@ from .plugin_interfaces import (
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
 )
+from ..utils.debug_logger import DebugLogger
 
 PluginType = Literal[
     "event_understanding",
@@ -81,11 +80,11 @@ class CognitiveCore:
             "events_processed": 0,
             "memory_consolidations": 0,
             "average_processing_time": 0.0,
-            "last_deep_consolidation": time.time(),
-            "last_light_consolidation": time.time(),
+            "last_deep_consolidation": 0,
+            "last_light_consolidation": 0,
         }
 
-        self.logger = logging.getLogger("CognitiveCore")
+        self.logger = DebugLogger(debug_mode=True)
 
     def register_plugin(self, plugin_type: PluginType, plugin_instance):
         """注册自定义插件"""
@@ -208,9 +207,7 @@ class CognitiveCore:
             self._generate_and_execute_behavior(understood_data)
 
             processing_time = time.time() - start_time
-            self.logger.debug(
-                f"事件处理完成: {understood_data.event_type}, 耗时: {processing_time:.3f}s"
-            )
+            self.logger.debug(f"事件处理完成, 耗时: {processing_time:.3f}s")
 
         except Exception as e:
             self.logger.error(f"处理事件失败: {e}")
@@ -231,6 +228,7 @@ class CognitiveCore:
 
         try:
             result = plugin.understand_event(input_data)
+            self.logger.debug(result)
             return result
         except Exception as e:
             self.logger.error(f"事件理解插件错误: {e}")
@@ -280,10 +278,7 @@ class CognitiveCore:
             memory_manager: MemoryManagerPlugin = self.get_plugin("memory_manager")
 
             if memory_manager and understood_data.memory_query_plan:
-                if (
-                    understood_data.memory_query_plan.query_type
-                    == MemoryQueryType.LONG_TERM_FRESH
-                ):
+                if understood_data.memory_query_plan.query_type == "long_term_fresh":
                     # 从文件获取
                     episodic_memories: List[EpisodicMemoriesModels] = (
                         memory_manager.query_episodic_memories(
@@ -295,10 +290,7 @@ class CognitiveCore:
                     self.episodic_memory_manager.save_episodic_memories(
                         episodic_memories
                     )
-                elif (
-                    understood_data.memory_query_plan.query_type
-                    == MemoryQueryType.LONG_TERM_CACHED
-                ):
+                elif understood_data.memory_query_plan.query_type == "long_term_cached":
                     # 从缓存获取
                     episodic_memories: List[EpisodicMemoriesModels] = (
                         self.episodic_memory_manager.query_episodic_memories(
@@ -325,14 +317,17 @@ class CognitiveCore:
                 social_norms=[],
             )
 
+            self.logger.debug(cognitive_state)
             behavior_plan: BehaviorPlan = plugin.generate_behavior(cognitive_state)
 
             # 更新情境
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
 
+            self.logger.debug(behavior_plan)
             self._execute_behavior_plan(behavior_plan)
         except Exception as e:
+            # 'NoneType' object has no attribute 'current_situation'
             self.logger.error(f"行为生成插件错误: {e}")
 
     def _associative_recall(
@@ -370,7 +365,9 @@ class CognitiveCore:
             if not behavior_execution:
                 return
 
-            if behavior_plan.current_situation:
+            if behavior_plan.current_situation and isinstance(
+                behavior_plan.current_situation, str
+            ):
                 self.working_memory.current_situation = behavior_plan.current_situation
 
             # 这里应该通过Orchestrator发送到对应的AI模块
@@ -433,6 +430,7 @@ class CognitiveCore:
             extraction_result: List[EpisodicMemoriesGenerateModels] = (
                 extraction_plugin.extract_memories(extraction_data)
             )
+            self.logger.debug(extraction_result)
 
             event_map: Dict[str, CognitiveEvent] = {}
             for event in self.working_memory.recent_events:
@@ -544,7 +542,7 @@ class CognitiveCore:
     def get_system_status(self) -> Dict[str, Any]:
         """获取系统状态"""
         return {
-            "status": self.status,
+            "status": self.status.value,
             "cognitive_load": self.working_memory.cognitive_load,
             "working_memory_usage": len(self.working_memory.recent_events),
             "episodic_memory_usage": len(

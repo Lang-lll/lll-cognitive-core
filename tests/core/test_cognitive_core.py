@@ -7,7 +7,6 @@ from lll_simple_ai_shared import (
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
-    MemoryQueryType,
     MemoryQueryPlan,
     EpisodicMemoriesModels,
     EpisodicMemoriesGenerateModels,
@@ -351,7 +350,7 @@ class TestCognitiveCore:
             key_entities=[],
             importance_score=0,
             memory_query_plan=MemoryQueryPlan(
-                query_type=MemoryQueryType.LONG_TERM_FRESH,
+                query_type="long_term_fresh",
                 time_range=[0, 1],
                 query_triggers=["work", "meeting"],
                 importance_score_filter=0,

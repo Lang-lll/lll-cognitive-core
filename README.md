@@ -33,7 +33,7 @@ def main():
     core_config = CognitiveCoreConfig()
     _, cognitive_core = create_cognitive_app(core_config)
 
-    # 加载.env文件
+    # 加载.env文件，或者你也可以用其他方式
     load_dotenv()
     api_key = os.environ.get("DEEPSEEK_API_KEY")
     openai_config = CreateOpenaiConfig(
@@ -92,5 +92,10 @@ def main():
     cognitive_core.register_plugin(
         "memory_manager",
         CognitiveCorePluginDefaultMemoryManager(),
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=9000,
     )
 ```

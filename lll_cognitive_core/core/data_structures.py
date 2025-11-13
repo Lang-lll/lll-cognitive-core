@@ -77,7 +77,7 @@ class CognitiveEvent:
     timestamp: float  # 发生时间戳
     source: str  # 事件来源
     # event_type: str  # 事件类型
-    modality_type: str  # asr 语音识别输入 tts 语音输出 motor 动作执行 vision 图像识别 sensor 传感器数据 system 系统状态
+    modality_type: str  # asr 语音识别输入 tts 语音输出 motion 动作执行 vision 图像识别 sensor 传感器数据 system 系统状态
     raw_data: UnderstandEventData  # 原始数据
     understood_data: UnderstoodData  # 理解后的数据
     importance_score: float  # 重要性评分

@@ -12,7 +12,7 @@ class GetChatResponseInput:
     config: CreateOpenaiConfig
     input_template: str
     format_inputs_func: Any
-    inputs: Dict[str, Any]
+    inputs: BaseModel
     data_model: BaseModel
     add_messages: Optional[List[Dict[str, str]]] = None
 
