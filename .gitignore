@@ -32,6 +32,7 @@ Thumbs.db
 
 /scripts
 */scripts
+/memory
 
 # Distribution / packaging
 .Python
@@ -55,3 +56,5 @@ share/python-wheels/
 MANIFEST
 
 .coverage
+htmlcov
+.pytest_cache

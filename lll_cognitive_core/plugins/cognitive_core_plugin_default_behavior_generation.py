@@ -21,7 +21,7 @@ class CognitiveCorePluginDefaultBehaviorGeneration:
                 config=self._options.config,
                 input_template=behavior_system_template,
                 format_inputs_func=behavior_task_format_inputs,
-                add_messages=self._options.add_messages,
+                task_pre_messages=self._options.task_pre_messages,
                 inputs=raw_event,
                 data_model=BehaviorPlan,
             )

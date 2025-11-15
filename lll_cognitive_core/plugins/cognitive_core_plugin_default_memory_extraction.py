@@ -1,3 +1,4 @@
+from typing import List
 from lll_simple_ai_shared import (
     EpisodicMemoriesGenerateModels,
     extract_memories_system_template,
@@ -13,7 +14,7 @@ class CognitiveCorePluginDefaultMemoryExtraction:
 
     def extract_memories(
         self, raw_event: ExtractMemoriesInput
-    ) -> EpisodicMemoriesGenerateModels | None:
+    ) -> List[EpisodicMemoriesGenerateModels] | None:
         # 记忆整理
         return get_chat_response(
             GetChatResponseInput(
@@ -21,8 +22,8 @@ class CognitiveCorePluginDefaultMemoryExtraction:
                 config=self._options.config,
                 input_template=extract_memories_system_template,
                 format_inputs_func=extract_memories_task_format_inputs,
-                add_messages=self._options.add_messages,
+                task_pre_messages=self._options.task_pre_messages,
                 inputs=raw_event,
-                data_model=EpisodicMemoriesGenerateModels,
+                data_model=List[EpisodicMemoriesGenerateModels],
             )
         )

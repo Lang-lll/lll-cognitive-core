@@ -116,6 +116,8 @@ class CognitiveCore:
             return
 
         self.status = CoreStatus.WINDING_DOWN
+        # 检测是否进入睡眠，临时
+        self._check_sleep()
 
     def receive_event(self, raw_event: Dict[str, str]):
         """接收事件"""
@@ -144,6 +146,7 @@ class CognitiveCore:
                 # 更新系统状态
                 self._update_system_state()
 
+                # TODO: 修复 WINDING_DOWN
                 # 检测是否进入睡眠
                 self._check_sleep()
 
@@ -228,7 +231,7 @@ class CognitiveCore:
 
         try:
             result = plugin.understand_event(input_data)
-            self.logger.debug(result)
+            self.logger.debug(f"事件理解: {result}")
             return result
         except Exception as e:
             self.logger.error(f"事件理解插件错误: {e}")
@@ -298,6 +301,7 @@ class CognitiveCore:
                             keywords=understood_data.memory_query_plan.query_triggers,
                         )
                     )
+                self.logger.debug(f"历史记忆: {episodic_memories}")
 
             # 获取联想回忆结果
             episodic_memories_text: str | None = None
@@ -316,18 +320,19 @@ class CognitiveCore:
                 episodic_memories_text=episodic_memories_text,
                 social_norms=[],
             )
-
-            self.logger.debug(cognitive_state)
             behavior_plan: BehaviorPlan = plugin.generate_behavior(cognitive_state)
+
+            self.logger.debug(f"生成和执行行为: {behavior_plan}")
+
+            if not behavior_plan:
+                return
 
             # 更新情境
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
 
-            self.logger.debug(behavior_plan)
             self._execute_behavior_plan(behavior_plan)
         except Exception as e:
-            # 'NoneType' object has no attribute 'current_situation'
             self.logger.error(f"行为生成插件错误: {e}")
 
     def _associative_recall(
@@ -345,9 +350,10 @@ class CognitiveCore:
             episodic_memories=episodic_memories,
             active_goals=self.working_memory.active_goals,
         )
-
+        result = plugin.associative_recall(recall_request)
+        self.logger.debug(f"联想回忆: {result}")
         try:
-            return plugin.associative_recall(recall_request)
+            return result
         except Exception as e:
             self.logger.error(f"联想回忆插件错误: {e}")
             return None
@@ -427,10 +433,8 @@ class CognitiveCore:
                 active_goals=self.working_memory.active_goals,
             )
 
-            extraction_result: List[EpisodicMemoriesGenerateModels] = (
-                extraction_plugin.extract_memories(extraction_data)
-            )
-            self.logger.debug(extraction_result)
+            extraction_result = extraction_plugin.extract_memories(extraction_data)
+            self.logger.debug(f"记忆提取: {extraction_result}")
 
             event_map: Dict[str, CognitiveEvent] = {}
             for event in self.working_memory.recent_events:

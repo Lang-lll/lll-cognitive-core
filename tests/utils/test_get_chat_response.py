@@ -74,7 +74,6 @@ class TestGetChatResponse:
             inputs=self.inputs,
             data_model=self.data_model,
         )
-        print(input_data)
 
         # 执行
         result = get_chat_response(input_data)

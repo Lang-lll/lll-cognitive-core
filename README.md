@@ -48,7 +48,7 @@ def main():
         "event_understanding",
         CognitiveCorePluginDefaultEventUnderstanding(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, add_messages=[]
+                client=client, config=openai_config, task_pre_messages=[]
             )
         ),
     )
@@ -57,7 +57,7 @@ def main():
         "associative_recall",
         CognitiveCorePluginDefaultAssociativeRecall(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, add_messages=[]
+                client=client, config=openai_config, task_pre_messages=[]
             )
         ),
     )
@@ -66,7 +66,7 @@ def main():
         "behavior_generation",
         CognitiveCorePluginDefaultBehaviorGeneration(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, add_messages=[]
+                client=client, config=openai_config, task_pre_messages=[]
             )
         ),
     )
@@ -84,7 +84,7 @@ def main():
         "memory_extraction",
         CognitiveCorePluginDefaultMemoryExtraction(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, add_messages=[]
+                client=client, config=openai_config, task_pre_messages=[]
             )
         ),
     )

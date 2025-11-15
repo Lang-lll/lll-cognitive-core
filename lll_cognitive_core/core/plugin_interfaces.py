@@ -34,7 +34,9 @@ class BehaviorExecutionPlugin:
 class MemoryExtractionPlugin:
     """记忆提取插件基类 - 只定义与CognitiveCore交互的接口"""
 
-    def extract_memories(self, data: ExtractMemoriesInput) -> Dict:
+    def extract_memories(
+        self, data: ExtractMemoriesInput
+    ) -> List[EpisodicMemoriesGenerateModels]:
         """从工作记忆中提取结构化记忆 - 核心接口方法"""
         return List[EpisodicMemoriesGenerateModels]
 

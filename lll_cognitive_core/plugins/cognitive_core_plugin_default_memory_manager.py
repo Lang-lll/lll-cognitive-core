@@ -21,6 +21,7 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
             # 通过time_index.json快速筛选相关日期
             time_index = self.load_time_index()
             relevant_dates = []
+            # 'set' object has no attribute 'items'
             for date_str, meta in time_index["indexed_dates"].items():
                 current_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
@@ -74,7 +75,8 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
 
                     # 所有条件都满足
                     results.append(memory)
-
+            print(f"relevant_dates: {relevant_dates}")
+            print(f"results: {results}")
             return results
         except Exception as e:
             print(f"查询记忆错误: {e}")
@@ -122,6 +124,8 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         filename = f"memory_{date_str}.jsonl"
         filepath = os.path.join("memory/daily", filename)
 
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
         # 读取现有记忆（如果文件存在）
         existing_memories = []
         if os.path.exists(filepath):
@@ -162,7 +166,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         association_index: Dict,
     ):
         """更新单个日期在所有索引中的信息"""
-
         # 1. 更新时间索引
         if date_str not in time_index["indexed_dates"]:
             time_index["indexed_dates"][date_str] = {
@@ -170,6 +173,11 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                 "keywords": set(),
                 "associations": set(),
             }
+        else:
+            # 如果已存在，转换list为set
+            date_meta = time_index["indexed_dates"][date_str]
+            date_meta["keywords"] = set(date_meta.get("keywords", []))
+            date_meta["associations"] = set(date_meta.get("associations", []))
 
         date_meta = time_index["indexed_dates"][date_str]
         date_meta["memory_count"] = len(memories)
@@ -177,7 +185,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         # 2. 更新关键词和联想词索引
         for memory in memories:
             if memory.keywords is not None:
-                # 更新关键词索引
                 for keyword in memory.keywords:
                     if keyword not in keyword_index:
                         keyword_index[keyword] = set()
@@ -185,7 +192,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                     date_meta["keywords"].add(keyword)
 
             if memory.associations is not None:
-                # 更新联想词索引
                 for association in memory.associations:
                     if association not in association_index:
                         association_index[association] = set()
@@ -216,10 +222,12 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         self, filepath: str, memories: List[EpisodicMemoriesModels]
     ):
         """保存记忆到JSONL文件"""
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
         with open(filepath, "w", encoding="utf-8") as f:
             for memory in memories:
                 # 转换为字典并确保timestamp是字符串
-                memory_dict = memory.dict()
+                memory_dict = memory.model_dump()
                 memory_dict["timestamp"] = memory.timestamp.isoformat()
                 f.write(json.dumps(memory_dict, ensure_ascii=False) + "\n")
 
@@ -232,12 +240,15 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
             return []
 
         memories = []
-        with open(filepath, "r", encoding="utf-8") as f:
-            for line in f:
-                data = json.loads(line.strip())
-                # 转换字符串timestamp回datetime对象
-                data["timestamp"] = datetime.fromisoformat(data["timestamp"])
-                memories.append(EpisodicMemoriesModels(**data))
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                for line in f:
+                    data = json.loads(line.strip())
+                    # 转换字符串timestamp回datetime对象
+                    data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+                    memories.append(EpisodicMemoriesModels(**data))
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"加载记忆文件 {filepath} 失败: {e}")
 
         return memories
 
@@ -333,10 +344,20 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
     def save_generic_index(self, filepath: str, index_data: Dict):
         """通用索引保存函数"""
         try:
-            # 将set转换为list以便JSON序列化
-            serializable_index = {}
-            for key, id_set in index_data.items():
-                serializable_index[key] = list(id_set)
+
+            def make_serializable(obj):
+                """递归地将set转换为list，处理嵌套结构"""
+                if isinstance(obj, set):
+                    return list(obj)
+                elif isinstance(obj, dict):
+                    return {key: make_serializable(value) for key, value in obj.items()}
+                elif isinstance(obj, list):
+                    return [make_serializable(item) for item in obj]
+                else:
+                    return obj
+
+            # 序列化整个数据结构
+            serializable_index = make_serializable(index_data)
 
             # 确保目录存在
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
