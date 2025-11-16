@@ -18,6 +18,7 @@ from .data_structures import *
 from .plugin_interfaces import (
     EventUnderstandingPlugin,
     AssociativeRecallPlugin,
+    AssociativeRecallFilterPlugin,
     BehaviorGenerationPlugin,
     BehaviorExecutionPlugin,
     MemoryExtractionPlugin,
@@ -58,6 +59,7 @@ class CognitiveCore:
         self.plugins = {
             "event_understanding": None,
             "associative_recall": None,
+            "associative_recall_filter": None,
             "behavior_generation": None,
             "behavior_execution": None,
             "memory_extraction": None,
@@ -69,6 +71,10 @@ class CognitiveCore:
             config.episodic_memories_direct_threshold or 5
         )
         self.max_processed_count_on_loop = config.max_processed_count_on_loop or 10
+        self.max_associative_recall_items = config.max_associative_recall_items or 30
+        self.associative_recall_truncate_mode = (
+            config.associative_recall_truncate_mode or "last"
+        )
 
         # 事件处理系统
         self.event_queue = queue.Queue()
@@ -287,6 +293,7 @@ class CognitiveCore:
                         memory_manager.query_episodic_memories(
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
+                            query_strategy=understood_data.memory_query_plan.query_strategy,
                         )
                     )
                     # 保存到缓存
@@ -299,6 +306,7 @@ class CognitiveCore:
                         self.episodic_memory_manager.query_episodic_memories(
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
+                            query_strategy=understood_data.memory_query_plan.query_strategy,
                         )
                     )
                 self.logger.debug(f"历史记忆: {episodic_memories}")
@@ -306,7 +314,28 @@ class CognitiveCore:
             # 获取联想回忆结果
             episodic_memories_text: str | None = None
             if len(episodic_memories) > self.episodic_memories_direct_threshold:
-                result = self._associative_recall(episodic_memories)
+                # 如果查询结果过长，需要过滤
+                associative_recall_filter: AssociativeRecallFilterPlugin = (
+                    self.get_plugin("associative_recall_filter")
+                )
+                query_too_many_results = True
+
+                if associative_recall_filter:
+                    episodic_memories, was_truncated = (
+                        associative_recall_filter.episodic_memories_filter(
+                            episodic_memories=episodic_memories,
+                            limit=self.max_associative_recall_items,
+                            truncate_mode=self.associative_recall_truncate_mode,
+                        )
+                    )
+                    query_too_many_results = was_truncated
+                else:
+                    # 没有过滤插件则清空列表
+                    episodic_memories = []
+
+                result = self._associative_recall(
+                    episodic_memories, query_too_many_results
+                )
                 if result:
                     episodic_memories_text = result.recalled_episode
                     if result.current_situation:
@@ -336,7 +365,9 @@ class CognitiveCore:
             self.logger.error(f"行为生成插件错误: {e}")
 
     def _associative_recall(
-        self, episodic_memories: List["EpisodicMemoriesModels"]
+        self,
+        episodic_memories: List["EpisodicMemoriesModels"],
+        query_too_many_results: bool,
     ) -> RecallResultsModels | None:
         """联想回忆"""
         plugin: AssociativeRecallPlugin = self.get_plugin("associative_recall")
@@ -348,6 +379,7 @@ class CognitiveCore:
             current_situation=self.working_memory.current_situation,
             recent_events=self.working_memory.recent_events,
             episodic_memories=episodic_memories,
+            query_too_many_results=query_too_many_results,
             active_goals=self.working_memory.active_goals,
         )
         result = plugin.associative_recall(recall_request)

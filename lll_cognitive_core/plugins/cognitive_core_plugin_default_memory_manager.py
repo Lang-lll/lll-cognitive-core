@@ -8,7 +8,7 @@ from ..core.plugin_interfaces import MemoryManagerPlugin
 
 class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
     def query_episodic_memories(
-        self, date_range, importance_min=0, keywords=None, associations=None
+        self, date_range, importance_min=0, keywords=None, query_strategy="semantic"
     ) -> List[EpisodicMemoriesModels]:
         """
         多维度记忆查询
@@ -21,7 +21,7 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
             # 通过time_index.json快速筛选相关日期
             time_index = self.load_time_index()
             relevant_dates = []
-            # 'set' object has no attribute 'items'
+
             for date_str, meta in time_index["indexed_dates"].items():
                 current_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
@@ -33,19 +33,27 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                 if meta["importance_range"][1] < importance_min:
                     continue
 
-                # 关键词预过滤（如果有的话）
-                if keywords and not any(
-                    kw in meta.get("keywords", []) for kw in keywords
-                ):
+                # 策略1: semantic - 不进行关键词预过滤，加载所有相关日期的数据
+                if query_strategy == "semantic":
+                    relevant_dates.append(date_str)
                     continue
 
-                # 联想词预过滤（如果有的话）
-                if associations and not any(
-                    assoc in meta.get("associations", []) for assoc in associations
-                ):
-                    continue
+                # 策略2: keyword - 进行关键词预过滤
+                elif query_strategy == "keyword" and keywords:
+                    # 关键词预过滤（宽松匹配，避免过度过滤）
+                    keyword_match = any(
+                        kw in meta.get("keywords", []) for kw in keywords
+                    )
+                    # 联想词预过滤
+                    association_match = any(
+                        assoc in meta.get("associations", []) for assoc in keywords
+                    )
 
-                relevant_dates.append(date_str)
+                    if keyword_match or association_match:
+                        relevant_dates.append(date_str)
+                else:
+                    # 没有关键词的keyword策略，加载所有相关日期
+                    relevant_dates.append(date_str)
 
             # 加载相关日期的文件进行精细筛选
             results: List[EpisodicMemoriesModels] = []
@@ -57,24 +65,27 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                     if memory.importance < importance_min:
                         continue
 
-                    # 关键词精确匹配
-                    keyword_match = True
-                    if keywords:
-                        keyword_match = any(kw in memory.keywords for kw in keywords)
-                        if not keyword_match:
-                            continue
+                    # 根据查询策略进行过滤
+                    if query_strategy == "semantic":
+                        # semantic策略：不进行关键词过滤，加载所有符合时间重要性的记忆
+                        results.append(memory)
 
-                    # 联想词匹配
-                    association_match = True
-                    if associations:
-                        association_match = any(
-                            assoc in memory.associations for assoc in associations
-                        )
-                        if not association_match:
-                            continue
+                    elif query_strategy == "keyword":
+                        if not keywords:
+                            # 没有关键词时，加载所有记忆
+                            results.append(memory)
+                        else:
+                            # 关键词策略：进行精确匹配
+                            keyword_match = any(
+                                kw in memory.keywords for kw in keywords
+                            )
+                            association_match = any(
+                                assoc in memory.associations for assoc in keywords
+                            )
 
-                    # 所有条件都满足
-                    results.append(memory)
+                            if keyword_match or association_match:
+                                results.append(memory)
+
             print(f"relevant_dates: {relevant_dates}")
             print(f"results: {results}")
             return results
@@ -173,11 +184,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                 "keywords": set(),
                 "associations": set(),
             }
-        else:
-            # 如果已存在，转换list为set
-            date_meta = time_index["indexed_dates"][date_str]
-            date_meta["keywords"] = set(date_meta.get("keywords", []))
-            date_meta["associations"] = set(date_meta.get("associations", []))
 
         date_meta = time_index["indexed_dates"][date_str]
         date_meta["memory_count"] = len(memories)
@@ -330,12 +336,29 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
             with open(filepath, "r", encoding="utf-8") as f:
                 index_data = json.load(f)
 
-            # 将列表转换回set以便操作
-            processed_index = {}
-            for key, id_list in index_data.items():
-                processed_index[key] = set(id_list)
+            def convert_arrays_to_sets(obj):
+                """递归将列表转换为集合"""
+                if isinstance(obj, dict):
+                    # 如果是字典，递归处理每个值
+                    return {
+                        key: convert_arrays_to_sets(value) for key, value in obj.items()
+                    }
+                elif isinstance(obj, list):
+                    # 如果是列表，转换为集合（但保留原始列表结构信息）
+                    try:
+                        # 只有当列表元素都是字符串时才转换为set
+                        if obj and all(isinstance(item, str) for item in obj):
+                            return set(obj)
+                        else:
+                            # 对于混合类型或非字符串列表，保持原样或递归处理
+                            return [convert_arrays_to_sets(item) for item in obj]
+                    except:
+                        return obj
+                else:
+                    # 其他类型保持原样
+                    return obj
 
-            return processed_index
+            return convert_arrays_to_sets(index_data)
 
         except (json.JSONDecodeError, KeyError) as e:
             print(f"加载索引文件 {filepath} 失败: {e}")

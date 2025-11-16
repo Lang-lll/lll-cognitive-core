@@ -156,7 +156,7 @@ class TestCacheMemoryManager:
         date_range = ["2024-01-15", "2024-01-17"]
         keywords = ["work"]
         results = self.memory_manager.query_episodic_memories(
-            date_range, keywords=keywords
+            date_range, keywords=keywords, query_strategy="keyword"
         )
 
         # 验证
@@ -327,6 +327,246 @@ class TestCacheMemoryManager:
             keyword != ""
             for keyword in self.memory_manager.episodic_memory.keyword_index.keys()
         )
+
+    def test_query_episodic_memories_semantic_strategy_no_keywords(self):
+        """测试semantic策略在没有关键词时加载所有相关日期的记忆"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2, self.test_memory_3]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用semantic策略，没有关键词
+        date_range = ["2024-01-15", "2024-01-17"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="semantic"
+        )
+
+        # 验证：semantic策略应该返回所有时间范围内的记忆，不进行关键词过滤
+        assert len(results) == 3
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+        assert "mem_3" in memory_ids
+
+    def test_query_episodic_memories_semantic_strategy_with_keywords(self):
+        """测试semantic策略在有关键词时也加载所有相关日期的记忆（不进行关键词预过滤）"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2, self.test_memory_3]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用semantic策略，有关键词
+        date_range = ["2024-01-15", "2024-01-17"]
+        keywords = ["work"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="semantic"
+        )
+
+        # 验证：semantic策略应该忽略关键词预过滤，返回所有时间范围内的记忆
+        assert len(results) == 3
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+        assert "mem_3" in memory_ids
+
+    def test_query_episodic_memories_keyword_strategy_no_keywords(self):
+        """测试keyword策略在没有关键词时加载所有相关日期的记忆"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2, self.test_memory_3]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用keyword策略，没有关键词
+        date_range = ["2024-01-15", "2024-01-17"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="keyword"
+        )
+
+        # 验证：没有关键词时，keyword策略应该返回所有时间范围内的记忆
+        assert len(results) == 3
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+        assert "mem_3" in memory_ids
+
+    def test_query_episodic_memories_keyword_strategy_with_keywords(self):
+        """测试keyword策略在有关键词时进行关键词过滤"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2, self.test_memory_3]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用keyword策略，有特定关键词
+        date_range = ["2024-01-15", "2024-01-17"]
+        keywords = ["work"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：keyword策略应该只返回包含关键词的记忆
+        assert len(results) == 2
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_3" in memory_ids
+        assert "mem_2" not in memory_ids
+
+    def test_query_episodic_memories_keyword_strategy_with_associations(self):
+        """测试keyword策略的联想词匹配"""
+        # 创建包含联想词的测试记忆
+        memory_with_associations = TestEpisodicMemoryModel(
+            id="mem_assoc",
+            timestamp=datetime(2024, 1, 18, 10, 0, 0),
+            importance=0.8,
+            keywords=["project"],
+            associations=["collaboration", "teamwork"],
+            content="Team project collaboration",
+        )
+
+        # 保存记忆
+        self.memory_manager.save_episodic_memories([memory_with_associations])
+
+        # 使用keyword策略，通过联想词查询
+        date_range = ["2024-01-18", "2024-01-18"]
+        keywords = ["collaboration"]  # 联想词
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：应该匹配到联想词
+        assert len(results) == 1
+        assert results[0].id == "mem_assoc"
+
+    def test_query_episodic_memories_keyword_strategy_combined_keywords_associations(
+        self,
+    ):
+        """测试keyword策略同时匹配关键词和联想词"""
+        # 创建同时有关键词和联想词的记忆
+        memory_combined = TestEpisodicMemoryModel(
+            id="mem_combined",
+            timestamp=datetime(2024, 1, 19, 10, 0, 0),
+            importance=0.8,
+            keywords=["meeting"],
+            associations=["discussion"],
+            content="Important meeting discussion",
+        )
+
+        # 保存记忆
+        self.memory_manager.save_episodic_memories([memory_combined])
+
+        # 使用keyword策略，查询关键词和联想词
+        date_range = ["2024-01-19", "2024-01-19"]
+        keywords = ["meeting", "discussion"]  # 同时包含关键词和联想词
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：应该匹配到记忆
+        assert len(results) == 1
+        assert results[0].id == "mem_combined"
+
+    def test_query_episodic_memories_keyword_strategy_no_matching_keywords(self):
+        """测试keyword策略在没有匹配关键词时返回空结果"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用keyword策略，查询不存在的关键词
+        date_range = ["2024-01-15", "2024-01-16"]
+        keywords = ["nonexistent"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：应该返回空结果
+        assert len(results) == 0
+
+    def test_query_episodic_memories_keyword_strategy_partial_date_range(self):
+        """测试keyword策略在部分日期没有匹配时的行为"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2, self.test_memory_3]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用keyword策略，查询时间范围内只有部分日期有匹配关键词
+        date_range = ["2024-01-15", "2024-01-16"]  # 只包含mem_1和mem_2
+        keywords = ["work"]  # 只有mem_1匹配
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：应该只返回时间范围内且匹配关键词的记忆
+        assert len(results) == 1
+        assert results[0].id == "mem_1"
+
+    def test_query_episodic_memories_default_strategy(self):
+        """测试默认查询策略（semantic）"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 调用时不指定query_strategy，应该使用默认的semantic策略
+        date_range = ["2024-01-15", "2024-01-16"]
+        keywords = ["work"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords
+        )  # 不指定query_strategy
+
+        # 验证：默认应该使用semantic策略，返回所有时间范围内的记忆
+        assert len(results) == 2
+
+    def test_query_episodic_memories_combined_filters(self):
+        """测试组合过滤条件（时间范围+关键词+重要性）"""
+        # 准备包含不同重要性的记忆
+        memory_low_importance = TestEpisodicMemoryModel(
+            id="mem_low",
+            timestamp=datetime(2024, 1, 15, 11, 0, 0),
+            importance=0.3,
+            keywords=["work", "low"],
+            content="Low importance work",
+        )
+
+        memories = [self.test_memory_1, self.test_memory_2, memory_low_importance]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 组合查询：时间范围 + 关键词 + 重要性过滤
+        date_range = ["2024-01-15", "2024-01-16"]
+        keywords = ["work"]
+        importance_min = 0.5
+        results = self.memory_manager.query_episodic_memories(
+            date_range,
+            importance_min=importance_min,
+            keywords=keywords,
+            query_strategy="keyword",
+        )
+
+        # 验证：应该只返回mem_1（在时间范围内，匹配关键词，且重要性>=0.5）
+        assert len(results) == 1
+        assert results[0].id == "mem_1"
+        assert results[0].importance >= importance_min
+
+    def test_query_episodic_memories_empty_time_index(self):
+        """测试在时间索引为空时的查询行为"""
+        # 确保时间索引为空
+        self.memory_manager.episodic_memory.time_index.clear()
+
+        # 执行查询
+        date_range = ["2024-01-15", "2024-01-16"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="semantic"
+        )
+
+        # 验证：应该返回空结果
+        assert len(results) == 0
+
+    def test_query_episodic_memories_invalid_strategy(self):
+        """测试无效查询策略时的行为（应该回退到默认行为）"""
+        # 准备数据
+        memories = [self.test_memory_1, self.test_memory_2]
+        self.memory_manager.save_episodic_memories(memories)
+
+        # 使用无效的查询策略
+        date_range = ["2024-01-15", "2024-01-16"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="invalid_strategy"
+        )
+
+        # 验证：应该回退到默认行为（类似semantic策略）
+        assert len(results) == 2
 
 
 # 运行测试

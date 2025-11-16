@@ -25,6 +25,7 @@ class AssociativeRecallInput(BaseModel):
     current_situation: str
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
+    query_too_many_results: bool
     active_goals: List["Goal"]
 
 
@@ -116,6 +117,7 @@ class CoreStatus(Enum):
 class EpisodicMemory:
     episodic_memories: Dict[str, EpisodicMemoriesModels]  # 记忆片段列表
     keyword_index: Dict[str, List[str]]  # 关键词索引
+    association_index: Dict[str, List[str]]  # 联想词索引
     time_index: Dict[str, List[str]]  # 时间索引
 
 

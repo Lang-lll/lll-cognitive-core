@@ -28,6 +28,13 @@ from lll_cognitive_core import (
     CognitiveCorePluginDefaultMemoryManager,
 )
 
+from lll_simple_ai_shared import (
+    understand_output_json_template,
+    associative_recall_output_json_template,
+    behavior_output_json_template,
+    extract_memories_output_json_template,
+)
+
 
 def main():
     core_config = CognitiveCoreConfig()
@@ -48,7 +55,14 @@ def main():
         "event_understanding",
         CognitiveCorePluginDefaultEventUnderstanding(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, task_pre_messages=[]
+                client=client,
+                config=openai_config,
+                task_pre_messages=[
+                    {
+                        "role": "system",
+                        "content": understand_output_json_template.render(),
+                    }
+                ],
             )
         ),
     )
@@ -57,7 +71,14 @@ def main():
         "associative_recall",
         CognitiveCorePluginDefaultAssociativeRecall(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, task_pre_messages=[]
+                client=client,
+                config=openai_config,
+                task_pre_messages=[
+                    {
+                        "role": "system",
+                        "content": associative_recall_output_json_template.render(),
+                    }
+                ],
             )
         ),
     )
@@ -66,7 +87,14 @@ def main():
         "behavior_generation",
         CognitiveCorePluginDefaultBehaviorGeneration(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, task_pre_messages=[]
+                client=client,
+                config=openai_config,
+                task_pre_messages=[
+                    {
+                        "role": "system",
+                        "content": behavior_output_json_template.render(),
+                    }
+                ],
             )
         ),
     )
@@ -75,7 +103,7 @@ def main():
         "behavior_execution",
         CognitiveCorePluginDefaultBehaviorExecution(
             CognitiveCorePluginDefaultBehaviorExecutionOptions(
-                protocol="http", host="", port=80, path="/"
+                protocol="http", host="127.0.0.1", port=80, path="/webhook"
             ),
         ),
     )
@@ -84,7 +112,14 @@ def main():
         "memory_extraction",
         CognitiveCorePluginDefaultMemoryExtraction(
             DefaultPluginInitOptions(
-                client=client, config=openai_config, task_pre_messages=[]
+                client=client,
+                config=openai_config,
+                task_pre_messages=[
+                    {
+                        "role": "system",
+                        "content": extract_memories_output_json_template.render(),
+                    }
+                ],
             )
         ),
     )
@@ -92,6 +127,11 @@ def main():
     cognitive_core.register_plugin(
         "memory_manager",
         CognitiveCorePluginDefaultMemoryManager(),
+    )
+
+    cognitive_core.register_plugin(
+        "associative_recall_filter",
+        CognitiveCorePluginDefaultAssociativeRecallFilterPlugin(),
     )
 
     app.run(

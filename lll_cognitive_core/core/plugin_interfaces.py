@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Literal, Tuple
 from lll_simple_ai_shared import (
     UnderstoodData,
     RecallResultsModels,
@@ -63,6 +63,7 @@ class MemoryManagerPlugin:
         importance_min: Optional[int],
         keywords: Optional[List[str]],
         associations: Optional[List[str]],
+        query_strategy: Literal["semantic", "keyword"],
     ) -> List[EpisodicMemoriesModels]:
         """
         从存储加载情景记忆
@@ -74,3 +75,15 @@ class MemoryManagerPlugin:
             associations: 联想词
         """
         raise NotImplementedError("子类必须实现query_episodic_memories方法")
+
+
+class AssociativeRecallFilterPlugin:
+    """联想信息过滤"""
+
+    def episodic_memories_filter(
+        self,
+        episodic_memories: List[EpisodicMemoriesModels],
+        limit: int,
+        truncate_mode: Literal["first", "last"] = "last",
+    ) -> Tuple[List[EpisodicMemoriesModels], bool]:
+        return List[EpisodicMemoriesModels], False

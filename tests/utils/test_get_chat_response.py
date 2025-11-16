@@ -18,6 +18,10 @@ class TestDataModel(BaseModel):
     email: str
 
 
+class TestInputs(BaseModel):
+    name: str
+
+
 # 测试用的配置
 @dataclass
 class TestConfig:
@@ -36,13 +40,13 @@ class TestGetChatResponse:
 
         self.config = CreateOpenaiConfig(
             base_url="test_url",
-            api_key_name="test_key",
+            api_key="test_key",
             model="gpt-3.5-turbo",
             pre_messages=[],
         )
         self.input_template = "Test template with {name}"
         self.format_inputs_func = lambda inputs: inputs
-        self.inputs = {"name": "John"}
+        self.inputs = TestInputs(name="John")
         self.data_model = TestDataModel
 
     def create_mock_response(self, content: str):
@@ -108,7 +112,7 @@ class TestGetChatResponse:
             config=self.config,
             input_template=self.input_template,
             format_inputs_func=self.format_inputs_func,
-            inputs={"name": "Alice"},
+            inputs=TestInputs(name="Alice"),
             data_model=self.data_model,
         )
 
@@ -235,7 +239,7 @@ class TestGetChatResponse:
             config=self.config,
             input_template=self.input_template,
             format_inputs_func=self.format_inputs_func,
-            inputs={"name": "Bob"},
+            inputs=TestInputs(name="Bob"),
             data_model=self.data_model,
         )
 

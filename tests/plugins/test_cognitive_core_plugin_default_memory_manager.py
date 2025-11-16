@@ -182,9 +182,11 @@ class TestCognitiveCorePluginDefaultMemoryManager:
 
         mock_load_daily.side_effect = load_daily_side_effect
 
-        # 查询 2024-01-15 到 2024-01-16 的记忆
+        # 查询 2024-01-15 到 2024-01-16 的记忆 - 使用semantic策略
         date_range = ["2024-01-15", "2024-01-16"]
-        results = self.memory_manager.query_episodic_memories(date_range)
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="semantic"
+        )
 
         # 验证
         assert len(results) == 2
@@ -235,11 +237,11 @@ class TestCognitiveCorePluginDefaultMemoryManager:
 
         mock_load_daily.side_effect = load_daily_side_effect
 
-        # 查询包含 "work" 关键词的记忆
+        # 查询包含 "work" 关键词的记忆 - 使用keyword策略
         date_range = ["2024-01-15", "2024-01-17"]
         keywords = ["work"]
         results = self.memory_manager.query_episodic_memories(
-            date_range, keywords=keywords
+            date_range, keywords=keywords, query_strategy="keyword"
         )
 
         # 验证
@@ -291,10 +293,10 @@ class TestCognitiveCorePluginDefaultMemoryManager:
 
         mock_load_daily.side_effect = load_daily_side_effect
 
-        # 查询重要性 >= 0.85 的记忆
+        # 查询重要性 >= 0.85 的记忆 - 使用semantic策略
         date_range = ["2024-01-15", "2024-01-17"]
         results = self.memory_manager.query_episodic_memories(
-            date_range, importance_min=0.85
+            date_range, importance_min=0.85, query_strategy="semantic"
         )
 
         # 验证
@@ -451,6 +453,246 @@ class TestCognitiveCorePluginDefaultMemoryManager:
         # 验证 mem1 被更新
         mem1_merged = next(m for m in merged if m.id == "mem1")
         assert mem1_merged.content == "Updated"
+
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_time_index")
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_daily_memories")
+    def test_query_episodic_memories_semantic_strategy_no_keywords(
+        self, mock_load_daily, mock_load_time_index
+    ):
+        """测试semantic策略在没有关键词时加载所有相关日期的记忆"""
+        # 直接返回时间索引数据
+        mock_load_time_index.return_value = {
+            "indexed_dates": {
+                "2024-01-15": {
+                    "memory_count": 1,
+                    "keywords": ["work", "meeting"],
+                    "associations": [],
+                    "importance_range": [0.8, 0.8],
+                },
+                "2024-01-16": {
+                    "memory_count": 1,
+                    "keywords": ["lunch", "friends"],
+                    "associations": [],
+                    "importance_range": [0.9, 0.9],
+                },
+            }
+        }
+
+        # 模拟每日记忆加载
+        def load_daily_side_effect(date_str):
+            if date_str == "2024-01-15":
+                return [self.test_memory_1]
+            elif date_str == "2024-01-16":
+                return [self.test_memory_2]
+            return []
+
+        mock_load_daily.side_effect = load_daily_side_effect
+
+        # 使用semantic策略，没有关键词
+        date_range = ["2024-01-15", "2024-01-16"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="semantic"
+        )
+
+        # 验证：应该返回所有符合条件的记忆，不进行关键词过滤
+        assert len(results) == 2
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_time_index")
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_daily_memories")
+    def test_query_episodic_memories_semantic_strategy_with_keywords(
+        self, mock_load_daily, mock_load_time_index
+    ):
+        """测试semantic策略在有关键词时也加载所有相关日期的记忆（不进行关键词预过滤）"""
+        # 直接返回时间索引数据
+        mock_load_time_index.return_value = {
+            "indexed_dates": {
+                "2024-01-15": {
+                    "memory_count": 1,
+                    "keywords": ["work", "meeting"],
+                    "associations": [],
+                    "importance_range": [0.8, 0.8],
+                },
+                "2024-01-16": {
+                    "memory_count": 1,
+                    "keywords": ["lunch", "friends"],
+                    "associations": [],
+                    "importance_range": [0.9, 0.9],
+                },
+            }
+        }
+
+        # 模拟每日记忆加载
+        def load_daily_side_effect(date_str):
+            if date_str == "2024-01-15":
+                return [self.test_memory_1]
+            elif date_str == "2024-01-16":
+                return [self.test_memory_2]
+            return []
+
+        mock_load_daily.side_effect = load_daily_side_effect
+
+        # 使用semantic策略，有关键词
+        date_range = ["2024-01-15", "2024-01-16"]
+        keywords = ["work"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="semantic"
+        )
+
+        # 验证：semantic策略应该忽略关键词预过滤，返回所有记忆
+        assert len(results) == 2
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_time_index")
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_daily_memories")
+    def test_query_episodic_memories_keyword_strategy_no_keywords(
+        self, mock_load_daily, mock_load_time_index
+    ):
+        """测试keyword策略在没有关键词时加载所有相关日期的记忆"""
+        # 直接返回时间索引数据
+        mock_load_time_index.return_value = {
+            "indexed_dates": {
+                "2024-01-15": {
+                    "memory_count": 1,
+                    "keywords": ["work", "meeting"],
+                    "associations": [],
+                    "importance_range": [0.8, 0.8],
+                },
+                "2024-01-16": {
+                    "memory_count": 1,
+                    "keywords": ["lunch", "friends"],
+                    "associations": [],
+                    "importance_range": [0.9, 0.9],
+                },
+            }
+        }
+
+        # 模拟每日记忆加载
+        def load_daily_side_effect(date_str):
+            if date_str == "2024-01-15":
+                return [self.test_memory_1]
+            elif date_str == "2024-01-16":
+                return [self.test_memory_2]
+            return []
+
+        mock_load_daily.side_effect = load_daily_side_effect
+
+        # 使用keyword策略，没有关键词
+        date_range = ["2024-01-15", "2024-01-16"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, query_strategy="keyword"
+        )
+
+        # 验证：没有关键词时，keyword策略应该返回所有记忆
+        assert len(results) == 2
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_2" in memory_ids
+
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_time_index")
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_daily_memories")
+    def test_query_episodic_memories_keyword_strategy_with_associations(
+        self, mock_load_daily, mock_load_time_index
+    ):
+        """测试keyword策略的联想词匹配"""
+        # 创建包含联想词的测试记忆
+        memory_with_associations = TestEpisodicMemoryModel(
+            id="mem_assoc",
+            timestamp=datetime(2024, 1, 18, 10, 0, 0),
+            importance=0.8,
+            keywords=["project"],
+            associations=["collaboration", "teamwork"],
+            content="Team project collaboration",
+        )
+
+        # 直接返回时间索引数据
+        mock_load_time_index.return_value = {
+            "indexed_dates": {
+                "2024-01-18": {
+                    "memory_count": 1,
+                    "keywords": ["project"],
+                    "associations": ["collaboration", "teamwork"],
+                    "importance_range": [0.8, 0.8],
+                },
+            }
+        }
+
+        # 模拟每日记忆加载
+        def load_daily_side_effect(date_str):
+            if date_str == "2024-01-18":
+                return [memory_with_associations]
+            return []
+
+        mock_load_daily.side_effect = load_daily_side_effect
+
+        # 使用keyword策略，通过联想词查询
+        date_range = ["2024-01-18", "2024-01-18"]
+        keywords = ["collaboration"]  # 联想词
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：应该匹配到联想词
+        assert len(results) == 1
+        assert results[0].id == "mem_assoc"
+
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_time_index")
+    @patch.object(CognitiveCorePluginDefaultMemoryManager, "load_daily_memories")
+    def test_query_episodic_memories_keyword_strategy_prefiltering(
+        self, mock_load_daily, mock_load_time_index
+    ):
+        """测试keyword策略的关键词预过滤功能"""
+        # 直接返回时间索引数据
+        mock_load_time_index.return_value = {
+            "indexed_dates": {
+                "2024-01-15": {
+                    "memory_count": 1,
+                    "keywords": ["work", "meeting"],
+                    "associations": [],
+                    "importance_range": [0.8, 0.8],
+                },
+                "2024-01-16": {
+                    "memory_count": 1,
+                    "keywords": ["lunch", "friends"],
+                    "associations": [],
+                    "importance_range": [0.9, 0.9],
+                },
+                "2024-01-17": {
+                    "memory_count": 1,
+                    "keywords": ["work", "deadline"],
+                    "associations": [],
+                    "importance_range": [0.7, 0.7],
+                },
+            }
+        }
+
+        # 模拟每日记忆加载 - 但只有匹配关键词的日期会被加载
+        def load_daily_side_effect(date_str):
+            if date_str == "2024-01-15":
+                return [self.test_memory_1]
+            elif date_str == "2024-01-17":
+                return [self.test_memory_3]
+            return []
+
+        mock_load_daily.side_effect = load_daily_side_effect
+
+        # 使用keyword策略，有特定关键词
+        date_range = ["2024-01-15", "2024-01-17"]
+        keywords = ["work"]
+        results = self.memory_manager.query_episodic_memories(
+            date_range, keywords=keywords, query_strategy="keyword"
+        )
+
+        # 验证：keyword策略应该进行预过滤，只加载包含关键词的日期
+        assert len(results) == 2
+        memory_ids = [memory.id for memory in results]
+        assert "mem_1" in memory_ids
+        assert "mem_3" in memory_ids
+        assert "mem_2" not in memory_ids
 
 
 # 运行测试

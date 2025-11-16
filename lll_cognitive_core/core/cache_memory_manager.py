@@ -8,11 +8,14 @@ from .plugin_interfaces import MemoryManagerPlugin
 class CacheMemoryManager(MemoryManagerPlugin):
     def __init__(self):
         self.episodic_memory = EpisodicMemory(
-            episodic_memories={}, keyword_index={}, time_index={}
+            episodic_memories={},
+            keyword_index={},
+            association_index={},  # 添加联想词索引
+            time_index={},
         )
 
     def query_episodic_memories(
-        self, date_range, importance_min=0, keywords=None, associations=None
+        self, date_range, importance_min=0, keywords=None, query_strategy="semantic"
     ) -> List[EpisodicMemoriesModels]:
         """
         多维度记忆查询
@@ -22,9 +25,10 @@ class CacheMemoryManager(MemoryManagerPlugin):
             # 解析时间范围
             start_date, end_date = self.parse_date_range(date_range)
 
-            # 通过time_index.json快速筛选相关日期
+            # 通过time_index快速筛选相关日期
             time_index = self.episodic_memory.time_index
             keyword_index = self.episodic_memory.keyword_index
+            association_index = self.episodic_memory.association_index
 
             # 初始化候选ID集合
             candidate_ids = set()
@@ -40,21 +44,38 @@ class CacheMemoryManager(MemoryManagerPlugin):
                 # 添加时间范围内的所有ID
                 candidate_ids.update(dateIdList)
 
-            # 如果有关键词，进行交集过滤
-            if keywords and candidate_ids:
-                keyword_ids_set = set()
+            # 根据查询策略进行过滤
+            if query_strategy == "semantic":
+                # semantic策略：不进行关键词过滤，只按时间和重要性
+                pass  # 保持所有时间范围内的ID
 
-                # 收集所有匹配关键词的ID
+            elif query_strategy == "keyword" and keywords:
+                # keyword策略：进行关键词精确匹配
+                keyword_ids_set = set()
+                association_ids_set = set()
+
+                # 收集匹配关键词和联想词的ID
                 for keyword in keywords:
+                    # 关键词匹配
                     if keyword in keyword_index:
                         keyword_ids_set.update(keyword_index[keyword])
+                    # 联想词匹配
+                    if keyword in association_index:
+                        association_ids_set.update(association_index[keyword])
 
-                # 取时间范围和关键词的交集
-                if keyword_ids_set:
-                    candidate_ids = candidate_ids.intersection(keyword_ids_set)
+                # 合并关键词和联想词的匹配结果
+                all_matched_ids = keyword_ids_set.union(association_ids_set)
+
+                if all_matched_ids:
+                    # 取时间范围和关键词/联想词的交集
+                    candidate_ids = candidate_ids.intersection(all_matched_ids)
                 else:
                     # 如果有关键词但没有匹配的，返回空结果
                     candidate_ids = set()
+
+            else:
+                # 其他情况或没有关键词的keyword策略，保持所有时间范围内的ID
+                pass
 
             # 获取记忆详情并过滤重要性
             episodic_memories: List[EpisodicMemoriesModels] = []
@@ -64,6 +85,7 @@ class CacheMemoryManager(MemoryManagerPlugin):
                     episodic_memories.append(memory)
 
             return episodic_memories
+
         except Exception as e:
             print(f"查询缓存记忆错误: {e}")
             return []
@@ -87,6 +109,7 @@ class CacheMemoryManager(MemoryManagerPlugin):
         # 更新索引
         time_index = self.episodic_memory.time_index
         keyword_index = self.episodic_memory.keyword_index
+        association_index = self.episodic_memory.association_index
 
         for date_str, memories in memories_by_date.items():
             if date_str not in time_index:
@@ -97,12 +120,21 @@ class CacheMemoryManager(MemoryManagerPlugin):
             time_index[date_str] = list(dict.fromkeys(time_index[date_str]))
 
             for memory in memories:
+                # 更新关键词索引
                 for keyword in memory.keywords:
                     if keyword not in keyword_index:
                         keyword_index[keyword] = []
                     if memory.id not in keyword_index[keyword]:
                         keyword_index[keyword].append(memory.id)
 
+                # 更新联想词索引
+                for association in memory.associations:
+                    if association not in association_index:
+                        association_index[association] = []
+                    if memory.id not in association_index[association]:
+                        association_index[association].append(memory.id)
+
+    # 其他方法保持不变...
     def group_memories_by_date(
         self, memories: List[EpisodicMemoriesModels]
     ) -> Dict[str, List[EpisodicMemoriesModels]]:
@@ -122,7 +154,6 @@ class CacheMemoryManager(MemoryManagerPlugin):
 
     def parse_date_range(self, date_range):
         """解析时间范围，支持多种格式"""
-
         # 默认返回今天
         start_date = datetime.now().date()
         end_date = datetime.now().date()
@@ -163,4 +194,5 @@ class CacheMemoryManager(MemoryManagerPlugin):
     def clear(self):
         self.episodic_memory.episodic_memories.clear()
         self.episodic_memory.keyword_index.clear()
+        self.episodic_memory.association_index.clear()
         self.episodic_memory.time_index.clear()
