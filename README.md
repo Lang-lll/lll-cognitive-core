@@ -21,6 +21,7 @@ from lll_cognitive_core import (
     DefaultPluginInitOptions,
     CognitiveCorePluginDefaultEventUnderstanding,
     CognitiveCorePluginDefaultAssociativeRecall,
+    CognitiveCorePluginDefaultAssociativeRecallFilter,
     CognitiveCorePluginDefaultBehaviorGeneration,
     CognitiveCorePluginDefaultBehaviorExecution,
     CognitiveCorePluginDefaultBehaviorExecutionOptions,
@@ -131,7 +132,7 @@ def main():
 
     cognitive_core.register_plugin(
         "associative_recall_filter",
-        CognitiveCorePluginDefaultAssociativeRecallFilterPlugin(),
+        CognitiveCorePluginDefaultAssociativeRecallFilter(),
     )
 
     app.run(

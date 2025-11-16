@@ -2,7 +2,7 @@ from typing import List, Literal, Tuple
 from lll_simple_ai_shared import EpisodicMemoriesModels
 
 
-class CognitiveCorePluginDefaultAssociativeRecallFilterPlugin:
+class CognitiveCorePluginDefaultAssociativeRecallFilter:
     def episodic_memories_filter(
         self,
         episodic_memories: List[EpisodicMemoriesModels],

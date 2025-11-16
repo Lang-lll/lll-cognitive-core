@@ -5,7 +5,7 @@ from .cognitive_core_plugin_default_associative_recall import (
     CognitiveCorePluginDefaultAssociativeRecall,
 )
 from .cognitive_core_plugin_default_associative_recall_filter import (
-    CognitiveCorePluginDefaultAssociativeRecallFilterPlugin,
+    CognitiveCorePluginDefaultAssociativeRecallFilter,
 )
 from .cognitive_core_plugin_default_behavior_generation import (
     CognitiveCorePluginDefaultBehaviorGeneration,
@@ -24,7 +24,7 @@ from .cognitive_core_plugin_default_memory_manager import (
 __all__ = [
     "CognitiveCorePluginDefaultEventUnderstanding",
     "CognitiveCorePluginDefaultAssociativeRecall",
-    "CognitiveCorePluginDefaultAssociativeRecallFilterPlugin",
+    "CognitiveCorePluginDefaultAssociativeRecallFilter",
     "CognitiveCorePluginDefaultBehaviorGeneration",
     "CognitiveCorePluginDefaultBehaviorExecution",
     "CognitiveCorePluginDefaultBehaviorExecutionOptions",
