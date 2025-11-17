@@ -30,8 +30,8 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                     continue
 
                 # 重要性范围过滤
-                if meta["importance_range"][1] < importance_min:
-                    continue
+                # if meta["importance_range"][1] < importance_min:
+                #     continue
 
                 # 策略1: semantic - 不进行关键词预过滤，加载所有相关日期的数据
                 if query_strategy == "semantic":
@@ -86,8 +86,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                             if keyword_match or association_match:
                                 results.append(memory)
 
-            print(f"relevant_dates: {relevant_dates}")
-            print(f"results: {results}")
             return results
         except Exception as e:
             print(f"查询记忆错误: {e}")

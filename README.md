@@ -39,7 +39,7 @@ from lll_simple_ai_shared import (
 
 def main():
     core_config = CognitiveCoreConfig()
-    _, cognitive_core = create_cognitive_app(core_config)
+    app, cognitive_core = create_cognitive_app(core_config)
 
     # 加载.env文件，或者你也可以用其他方式
     load_dotenv()

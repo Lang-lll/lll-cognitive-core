@@ -42,7 +42,6 @@ def get_chat_response(data: GetChatResponseInput):
                 response_format={"type": "json_object"},
             )
 
-            print(f"模型响应: {response.choices[0].message.content}")
             return parse_response_data(
                 response.choices[0].message.content, data.data_model
             )

@@ -181,6 +181,7 @@ class CognitiveCore:
             and processed_count < self.max_processed_count_on_loop
         ):  # 每轮最多处理10个事件
             try:
+                # TODO: 多事件合并
                 event_data: UnderstandEventData = self.event_queue.get_nowait()
                 self._process_single_event(event_data)
                 processed_count += 1
@@ -294,6 +295,7 @@ class CognitiveCore:
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
                             query_strategy=understood_data.memory_query_plan.query_strategy,
+                            importance_min=understood_data.memory_query_plan.importance_score_filter,
                         )
                     )
                     # 保存到缓存
@@ -307,6 +309,7 @@ class CognitiveCore:
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
                             query_strategy=understood_data.memory_query_plan.query_strategy,
+                            importance_min=understood_data.memory_query_plan.importance_score_filter,
                         )
                     )
                 self.logger.debug(f"历史记忆: {episodic_memories}")
