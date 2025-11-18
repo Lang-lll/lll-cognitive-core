@@ -23,6 +23,7 @@ class UnderstandEventInput(BaseModel):
 
 class AssociativeRecallInput(BaseModel):
     current_situation: str
+    main_events: str
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
     query_too_many_results: bool
@@ -31,6 +32,7 @@ class AssociativeRecallInput(BaseModel):
 
 class GenerateBehaviorInput(BaseModel):
     current_situation: str
+    main_events: str
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
     episodic_memories_text: str | None

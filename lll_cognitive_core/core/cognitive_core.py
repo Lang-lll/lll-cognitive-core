@@ -211,10 +211,10 @@ class CognitiveCore:
                 return
 
             # 更新工作记忆
-            self._update_working_memory(event_data, understood_data)
+            cognitive_event = self._update_working_memory(event_data, understood_data)
 
             # 行为生成和执行
-            self._generate_and_execute_behavior(understood_data)
+            self._generate_and_execute_behavior(understood_data, cognitive_event)
 
             processing_time = time.time() - start_time
             self.logger.debug(f"事件处理完成, 耗时: {processing_time:.3f}s")
@@ -246,7 +246,7 @@ class CognitiveCore:
 
     def _update_working_memory(
         self, event_data: UnderstandEventData, understood_data: UnderstoodData
-    ):
+    ) -> CognitiveEvent:
         """更新工作记忆"""
         # 创建认知事件
         cognitive_event = CognitiveEvent(
@@ -258,9 +258,6 @@ class CognitiveCore:
             understood_data=understood_data,
             importance_score=understood_data.importance_score or 0,
         )
-
-        # 添加到最近事件
-        self.working_memory.recent_events.append(cognitive_event)
 
         # 更新当前情境
         situation = understood_data.current_situation or None
@@ -276,7 +273,11 @@ class CognitiveCore:
             "session_start_time", time.time()
         )
 
-    def _generate_and_execute_behavior(self, understood_data: UnderstoodData):
+        return cognitive_event
+
+    def _generate_and_execute_behavior(
+        self, understood_data: UnderstoodData, cognitive_event: CognitiveEvent
+    ):
         """生成和执行行为"""
         plugin: BehaviorGenerationPlugin = self.get_plugin("behavior_generation")
 
@@ -312,7 +313,6 @@ class CognitiveCore:
                             importance_min=understood_data.memory_query_plan.importance_score_filter,
                         )
                     )
-                self.logger.debug(f"历史记忆: {episodic_memories}")
 
             # 获取联想回忆结果
             episodic_memories_text: str | None = None
@@ -337,7 +337,9 @@ class CognitiveCore:
                     episodic_memories = []
 
                 result = self._associative_recall(
-                    episodic_memories, query_too_many_results
+                    episodic_memories=episodic_memories,
+                    query_too_many_results=query_too_many_results,
+                    understood_data=understood_data,
                 )
                 if result:
                     episodic_memories_text = result.recalled_episode
@@ -346,6 +348,7 @@ class CognitiveCore:
 
             cognitive_state = GenerateBehaviorInput(
                 current_situation=self.working_memory.current_situation,
+                main_events=understood_data.main_content,
                 recent_events=self.working_memory.recent_events,
                 episodic_memories=episodic_memories,
                 active_goals=self.working_memory.active_goals,
@@ -363,6 +366,10 @@ class CognitiveCore:
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
 
+            # 添加到最近事件
+            if cognitive_event:
+                self.working_memory.recent_events.append(cognitive_event)
+
             self._execute_behavior_plan(behavior_plan)
         except Exception as e:
             self.logger.error(f"行为生成插件错误: {e}")
@@ -371,6 +378,7 @@ class CognitiveCore:
         self,
         episodic_memories: List["EpisodicMemoriesModels"],
         query_too_many_results: bool,
+        understood_data: UnderstoodData,
     ) -> RecallResultsModels | None:
         """联想回忆"""
         plugin: AssociativeRecallPlugin = self.get_plugin("associative_recall")
@@ -380,6 +388,7 @@ class CognitiveCore:
 
         recall_request = AssociativeRecallInput(
             current_situation=self.working_memory.current_situation,
+            main_events=understood_data.main_content,
             recent_events=self.working_memory.recent_events,
             episodic_memories=episodic_memories,
             query_too_many_results=query_too_many_results,
