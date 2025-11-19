@@ -15,7 +15,13 @@ class UnderstandEventData(BaseModel):
     timestamp: datetime
 
 
+class MorningSituationInput(BaseModel):
+    episodic_memories: List["EpisodicMemoriesModels"]
+    query_too_many_results: bool
+
+
 class UnderstandEventInput(BaseModel):
+    current_situation: str
     understand_event: UnderstandEventData
     recent_events: List["CognitiveEvent"]
     active_goals: List["Goal"]
@@ -109,9 +115,12 @@ class EmotionalState(Enum):
 
 
 class CoreStatus(Enum):
+    STIRRING = "stirring"
     AWAITING = "awaiting"
     AWARE = "aware"
+    PERCEIVING = "perceiving"
     WINDING_DOWN = "winding_down"
+    SLEEP = "sleep"
     DREAMING = "dreaming"
 
 

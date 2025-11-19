@@ -40,6 +40,7 @@ def get_chat_response(data: GetChatResponseInput):
                 model=data.config.model,
                 messages=all_messages,
                 response_format={"type": "json_object"},
+                timeout=data.config.timeout,
             )
 
             return parse_response_data(

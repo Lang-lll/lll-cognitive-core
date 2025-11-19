@@ -1,5 +1,6 @@
 from typing import Optional, List, Literal, Tuple
 from lll_simple_ai_shared import (
+    MorningSituationModels,
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
@@ -10,6 +11,12 @@ from .data_structures import *
 
 
 # 默认插件实现基类
+class MorningSituationPlugin:
+    def generate_morning_situation(self, data: MorningSituationInput) -> Dict:
+        # 生成睡醒情境认知
+        return MorningSituationModels
+
+
 class EventUnderstandingPlugin:
     def understand_event(self, raw_event: UnderstandEventInput) -> Dict:
         # 事件理解

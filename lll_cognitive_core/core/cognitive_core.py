@@ -3,6 +3,7 @@ import threading
 from datetime import datetime
 from typing import Literal, Dict, Optional, Any
 from lll_simple_ai_shared import (
+    MorningSituationModels,
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
@@ -16,6 +17,7 @@ from ..config.cognitive_core_config import CognitiveCoreConfig
 from .cache_memory_manager import CacheMemoryManager
 from .data_structures import *
 from .plugin_interfaces import (
+    MorningSituationPlugin,
     EventUnderstandingPlugin,
     AssociativeRecallPlugin,
     AssociativeRecallFilterPlugin,
@@ -57,6 +59,7 @@ class CognitiveCore:
 
         # 插件初始化
         self.plugins = {
+            "morning_situation": None,
             "event_understanding": None,
             "associative_recall": None,
             "associative_recall_filter": None,
@@ -109,6 +112,52 @@ class CognitiveCore:
             return
 
         """启动认知核心"""
+        # 苏醒，生成情境记忆
+        self.status = CoreStatus.STIRRING
+        try:
+            morning_situation: MorningSituationPlugin = self.get_plugin(
+                "morning_situation"
+            )
+            memory_manager: MemoryManagerPlugin = self.get_plugin("memory_manager")
+            associative_recall_filter: AssociativeRecallFilterPlugin = self.get_plugin(
+                "associative_recall_filter"
+            )
+
+            if morning_situation and memory_manager and associative_recall_filter:
+                # TODO: 缓存
+                episodic_memories: List[EpisodicMemoriesModels] = (
+                    memory_manager.query_episodic_memories(
+                        date_range=[0, 1],
+                        keywords=[],
+                        query_strategy="semantic",
+                        importance_min=0,
+                    )
+                )
+                # 如果查询结果过长，需要过滤
+                episodic_memories, was_truncated = (
+                    associative_recall_filter.episodic_memories_filter(
+                        episodic_memories=episodic_memories,
+                        limit=self.max_associative_recall_items,
+                        truncate_mode=self.associative_recall_truncate_mode,
+                    )
+                )
+                query_too_many_results = was_truncated
+                inputs = MorningSituationInput(
+                    episodic_memories=episodic_memories,
+                    query_too_many_results=query_too_many_results,
+                )
+                result: MorningSituationModels = (
+                    morning_situation.generate_morning_situation(inputs)
+                )
+
+                self.logger.debug(f"苏醒: {result}")
+
+                if result.current_situation:
+                    self.working_memory.current_situation = result.current_situation
+        except Exception as e:
+            self.logger.error(f"加载近期记忆失败: {e}")
+
+        # 启动
         self.status = CoreStatus.AWARE
         self.processing_thread = threading.Thread(
             target=self._processing_loop, daemon=True
@@ -118,12 +167,10 @@ class CognitiveCore:
 
     def sleep(self):
         """停止认知核心"""
-        if self.status != CoreStatus.AWARE:
+        if self.status != CoreStatus.AWARE and self.status != CoreStatus.PERCEIVING:
             return
 
         self.status = CoreStatus.WINDING_DOWN
-        # 检测是否进入睡眠，临时
-        self._check_sleep()
 
     def receive_event(self, raw_event: Dict[str, str]):
         """接收事件"""
@@ -131,6 +178,7 @@ class CognitiveCore:
             raw_type = raw_event.get("type", "")
             raw_data = raw_event.get("data", "")
 
+            # TODO: 区分普通信息和紧急信息
             if self.status == CoreStatus.AWARE and raw_type and raw_data:
                 event_with_context = UnderstandEventData(
                     type=raw_type,
@@ -144,30 +192,38 @@ class CognitiveCore:
 
     def _processing_loop(self):
         """主处理循环"""
-        while self.status == CoreStatus.AWARE:
+        while self.status in [CoreStatus.AWARE, CoreStatus.WINDING_DOWN]:
             try:
+                if self.status == CoreStatus.AWARE:
+                    self.status = CoreStatus.PERCEIVING
+
                 # 处理事件队列
                 self._process_events()
 
                 # 更新系统状态
                 self._update_system_state()
 
-                # TODO: 修复 WINDING_DOWN
-                # 检测是否进入睡眠
-                self._check_sleep()
+                # 恢复
+                if self.status == CoreStatus.PERCEIVING:
+                    self.status = CoreStatus.AWARE
 
-                time.sleep(0.02)  # 避免CPU过度占用
+                if self.status == CoreStatus.WINDING_DOWN:
+                    # 检测是否进入睡眠
+                    self._check_sleep()
+
+                time.sleep(0.05)  # 避免CPU过度占用
 
             except Exception as e:
                 self.logger.error(f"处理循环错误: {e}")
+
+                # 恢复
+                if self.status == CoreStatus.PERCEIVING:
+                    self.status = CoreStatus.AWARE
                 time.sleep(0.1)
 
     def _check_sleep(self):
-        if self.status == CoreStatus.WINDING_DOWN and self.event_queue.empty():
-
-            if self.processing_thread:
-                self.processing_thread.join(timeout=5.0)
-            self.logger.info("CognitiveCore 开始整理信息")
+        if self.status == CoreStatus.WINDING_DOWN:
+            self.stats == CoreStatus.SLEEP
 
             self._consolidate_memories("deep")
 
@@ -231,6 +287,7 @@ class CognitiveCore:
             return None
 
         input_data = UnderstandEventInput(
+            current_situation=self.working_memory.current_situation,
             understand_event=event_data,
             recent_events=self.working_memory.recent_events,
             active_goals=self.working_memory.active_goals,
@@ -470,6 +527,7 @@ class CognitiveCore:
             return
 
         try:
+            self.logger.info("CognitiveCore 开始整理信息")
             # 记忆提取阶段
             extraction_data = ExtractMemoriesInput(
                 current_situation=self.working_memory.current_situation,

@@ -1,13 +1,22 @@
 from .core.cognitive_core import CognitiveCore
 from .web.create_cognitive_app import create_cognitive_app
 from .web.create_openai import create_openai
-from .core.plugin_interfaces import MemoryManagerPlugin
+from .core.plugin_interfaces import (
+    MorningSituationPlugin,
+    EventUnderstandingPlugin,
+    AssociativeRecallPlugin,
+    BehaviorGenerationPlugin,
+    MemoryManagerPlugin,
+)
 from .config.cognitive_core_config import CognitiveCoreConfig
 from .config.create_openai_config import CreateOpenaiConfig
 from .utils.get_chat_response import get_chat_response, GetChatResponseInput
 from .utils.generate_template_prompt import generate_template_prompt
 from .core.data_structures import DefaultPluginInitOptions
 
+from .plugins.cognitive_core_plugin_default_morning_situation import (
+    CognitiveCorePluginDefaultMorningSituation,
+)
 from .plugins.cognitive_core_plugin_default_event_understanding import (
     CognitiveCorePluginDefaultEventUnderstanding,
 )
@@ -36,6 +45,10 @@ __all__ = [
     "CognitiveCore",
     "create_cognitive_app",
     "create_openai",
+    "MorningSituationPlugin",
+    "EventUnderstandingPlugin",
+    "AssociativeRecallPlugin",
+    "BehaviorGenerationPlugin",
     "MemoryManagerPlugin",
     "CognitiveCorePluginDefaultMemoryManager",
     "CognitiveCoreConfig",
@@ -44,6 +57,7 @@ __all__ = [
     "generate_template_prompt",
     "GetChatResponseInput",
     "DefaultPluginInitOptions",
+    "CognitiveCorePluginDefaultMorningSituation",
     "CognitiveCorePluginDefaultEventUnderstanding",
     "CognitiveCorePluginDefaultAssociativeRecall",
     "CognitiveCorePluginDefaultAssociativeRecallFilter",

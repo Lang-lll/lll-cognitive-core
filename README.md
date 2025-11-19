@@ -19,6 +19,7 @@ from lll_cognitive_core import (
     CognitiveCoreConfig,
     CreateOpenaiConfig,
     DefaultPluginInitOptions,
+    CognitiveCorePluginDefaultMorningSituation,
     CognitiveCorePluginDefaultEventUnderstanding,
     CognitiveCorePluginDefaultAssociativeRecall,
     CognitiveCorePluginDefaultAssociativeRecallFilter,
@@ -30,6 +31,7 @@ from lll_cognitive_core import (
 )
 
 from lll_simple_ai_shared import (
+    morning_situation_output_json_template,
     understand_output_json_template,
     associative_recall_output_json_template,
     behavior_output_json_template,
@@ -51,6 +53,22 @@ def main():
         pre_messages=[{"role": "system", "content": "You are a helpful assistant."}],
     )
     client = create_openai(openai_config)
+
+    cognitive_core.register_plugin(
+        "morning_situation",
+        CognitiveCorePluginDefaultMorningSituation(
+            DefaultPluginInitOptions(
+                client=client,
+                config=openai_config,
+                task_pre_messages=[
+                    {
+                        "role": "system",
+                        "content": morning_situation_output_json_template.render(),
+                    }
+                ],
+            )
+        ),
+    )
 
     cognitive_core.register_plugin(
         "event_understanding",

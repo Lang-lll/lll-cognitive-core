@@ -1,3 +1,6 @@
+from .cognitive_core_plugin_default_morning_situation import (
+    CognitiveCorePluginDefaultMorningSituation,
+)
 from .cognitive_core_plugin_default_event_understanding import (
     CognitiveCorePluginDefaultEventUnderstanding,
 )
@@ -22,6 +25,7 @@ from .cognitive_core_plugin_default_memory_manager import (
 )
 
 __all__ = [
+    "CognitiveCorePluginDefaultMorningSituation",
     "CognitiveCorePluginDefaultEventUnderstanding",
     "CognitiveCorePluginDefaultAssociativeRecall",
     "CognitiveCorePluginDefaultAssociativeRecallFilter",
