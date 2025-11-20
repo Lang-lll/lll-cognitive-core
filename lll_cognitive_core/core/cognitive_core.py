@@ -78,6 +78,7 @@ class CognitiveCore:
         self.associative_recall_truncate_mode = (
             config.associative_recall_truncate_mode or "last"
         )
+        self.config = config or CognitiveCoreConfig()
 
         # 事件处理系统
         self.event_queue = queue.Queue()
@@ -124,13 +125,27 @@ class CognitiveCore:
             )
 
             if morning_situation and memory_manager and associative_recall_filter:
-                # TODO: 缓存
+                # 先获取最近有记忆的日期
+                recent_dates = memory_manager.get_recent_memory_days(
+                    max_days_back=self.config.morning_max_days_back,
+                    min_importance=self.config.morning_memory_min_importance,
+                    max_back_days=self.config.morning_max_back_days,
+                )
+                print(f"recent_dates: {recent_dates}")
+
+                date_range: List[str] = [0, 0]
+                if len(recent_dates) == 1:
+                    date_range = [recent_dates[0], recent_dates[0]]
+                elif len(recent_dates) > 1:
+                    date_range = [recent_dates[-1], recent_dates[0]]
+                print(f"date_range: {date_range}")
+
                 episodic_memories: List[EpisodicMemoriesModels] = (
                     memory_manager.query_episodic_memories(
-                        date_range=[0, 1],
+                        date_range=date_range,
                         keywords=[],
                         query_strategy="semantic",
-                        importance_min=0,
+                        importance_min=self.config.morning_memory_min_importance,
                     )
                 )
                 # 如果查询结果过长，需要过滤
@@ -152,6 +167,7 @@ class CognitiveCore:
 
                 self.logger.debug(f"苏醒: {result}")
 
+                # episodic_memories存到缓存
                 if result.current_situation:
                     self.working_memory.current_situation = result.current_situation
         except Exception as e:

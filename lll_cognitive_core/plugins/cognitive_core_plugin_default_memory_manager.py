@@ -6,6 +6,7 @@ from lll_simple_ai_shared import EpisodicMemoriesModels
 from ..core.plugin_interfaces import MemoryManagerPlugin
 
 
+# TODO: 重新设计time_index、重要性过滤
 class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
     def query_episodic_memories(
         self, date_range, importance_min=0, keywords=None, query_strategy="semantic"
@@ -107,6 +108,32 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
 
         # 更新全局索引
         self.update_global_indexes(memories_by_date)
+
+    def get_recent_memory_days(
+        self, max_days_back=3, min_importance=0, max_back_days=1
+    ) -> List[str]:
+        """获取最近有记忆的日期"""
+        time_index = self.load_time_index()
+
+        relevant_dates = []
+
+        for days_ago in range(max_days_back + 1):
+            check_date = datetime.now().date() - timedelta(days=days_ago)
+            date_str = check_date.strftime("%Y-%m-%d")
+
+            if date_str in time_index["indexed_dates"]:
+                # meta = time_index["indexed_dates"][date_str]
+
+                # 重要性过滤：检查该日期是否有足够重要的记忆
+                # importance_max = meta.get("importance_range", [0, 100])[1]
+
+                # if importance_max >= min_importance:
+                relevant_dates.append(date_str)
+
+                if len(relevant_dates) >= max_back_days:
+                    break
+
+        return relevant_dates
 
     def group_memories_by_date(
         self, memories: List[EpisodicMemoriesModels]

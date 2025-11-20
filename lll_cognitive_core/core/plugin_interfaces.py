@@ -83,6 +83,12 @@ class MemoryManagerPlugin:
         """
         raise NotImplementedError("子类必须实现query_episodic_memories方法")
 
+    def get_recent_memory_days(
+        self, max_days_back=3, min_importance=0, max_back_days=1
+    ) -> List[str]:
+        """获取有记忆的最近N天"""
+        pass
+
 
 class AssociativeRecallFilterPlugin:
     """联想信息过滤"""

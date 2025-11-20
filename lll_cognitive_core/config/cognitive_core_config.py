@@ -12,3 +12,9 @@ class CognitiveCoreConfig:
     max_associative_recall_items: int = 30
     # 联想记忆超长时的截断模式，默认保留后面的
     associative_recall_truncate_mode: Literal["first", "last"] = "last"
+    # 苏醒阶段回顾几天的记忆
+    morning_max_days_back: int = 14
+    # 苏醒阶段只取最近几天的记忆
+    morning_max_back_days: int = 2
+    # 苏醒阶段回顾记忆重要性过滤
+    morning_memory_min_importance: int = 50
