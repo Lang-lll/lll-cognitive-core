@@ -305,6 +305,7 @@ class CognitiveCore:
         input_data = UnderstandEventInput(
             current_situation=self.working_memory.current_situation,
             understand_event=event_data,
+            # TODO: 过滤
             recent_events=self.working_memory.recent_events,
             active_goals=self.working_memory.active_goals,
         )

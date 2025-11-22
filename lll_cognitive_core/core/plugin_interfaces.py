@@ -100,3 +100,16 @@ class AssociativeRecallFilterPlugin:
         truncate_mode: Literal["first", "last"] = "last",
     ) -> Tuple[List[EpisodicMemoriesModels], bool]:
         return List[EpisodicMemoriesModels], False
+
+
+class ActionSearchPlugin:
+    """动作库查询"""
+
+    def get_main_index(self):
+        return []
+
+    def get_category_actions(self, category_name: str):
+        return []
+
+    def get_action_data(self, category_name: str, action_id: str):
+        return []
