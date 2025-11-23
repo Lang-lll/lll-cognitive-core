@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from openai import OpenAI
-from lll_simple_ai_shared import UnderstoodData, EpisodicMemoriesModels
+from lll_simple_ai_shared import (
+    UnderstoodData,
+    EpisodicMemoriesModels,
+)
 from ..config.create_openai_config import CreateOpenaiConfig
 
 
@@ -24,6 +27,7 @@ class UnderstandEventInput(BaseModel):
     current_situation: str
     understand_event: UnderstandEventData
     recent_events: List["CognitiveEvent"]
+    action_categories: List[Dict]
     active_goals: List["Goal"]
 
 
@@ -42,6 +46,7 @@ class GenerateBehaviorInput(BaseModel):
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
     episodic_memories_text: str | None
+    action_data: List[Dict]
     active_goals: List["Goal"]
     social_norms: List[str]
 

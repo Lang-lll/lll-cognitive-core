@@ -25,6 +25,7 @@ from .plugin_interfaces import (
     BehaviorExecutionPlugin,
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
+    ActionSearchPlugin,
 )
 from ..utils.debug_logger import DebugLogger
 
@@ -67,6 +68,7 @@ class CognitiveCore:
             "behavior_execution": None,
             "memory_extraction": None,
             "memory_manager": None,
+            "action_search": None,
         }
 
         # 超过多少条历史记忆就使用专门的回想任务处理
@@ -299,7 +301,8 @@ class CognitiveCore:
     ) -> Optional[Dict[str, Any]]:
         """事件理解阶段"""
         plugin: EventUnderstandingPlugin = self.get_plugin("event_understanding")
-        if not plugin:
+        action_search: ActionSearchPlugin = self.get_plugin("action_search")
+        if not plugin or not action_search:
             return None
 
         input_data = UnderstandEventInput(
@@ -308,6 +311,7 @@ class CognitiveCore:
             # TODO: 过滤
             recent_events=self.working_memory.recent_events,
             active_goals=self.working_memory.active_goals,
+            action_categories=action_search.get_main_index(),
         )
 
         try:
@@ -354,8 +358,9 @@ class CognitiveCore:
     ):
         """生成和执行行为"""
         plugin: BehaviorGenerationPlugin = self.get_plugin("behavior_generation")
+        action_search: ActionSearchPlugin = self.get_plugin("action_search")
 
-        if not plugin:
+        if not plugin or not action_search:
             return
 
         try:
@@ -427,6 +432,7 @@ class CognitiveCore:
                 episodic_memories=episodic_memories,
                 active_goals=self.working_memory.active_goals,
                 episodic_memories_text=episodic_memories_text,
+                action_data=action_search.get_category_actions(),
                 social_norms=[],
             )
             behavior_plan: BehaviorPlan = plugin.generate_behavior(cognitive_state)

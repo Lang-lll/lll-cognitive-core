@@ -6,7 +6,7 @@ from ..core.plugin_interfaces import ActionSearchPlugin
 INDEX_PATH = "memory/actions_index.json"
 
 
-class CognitiveCorePluginDefaultMorningSituation(ActionSearchPlugin):
+class CognitiveCorePluginDefaultActionSearch(ActionSearchPlugin):
     def __init__(self):
         self.main_index = None
 
@@ -18,7 +18,7 @@ class CognitiveCorePluginDefaultMorningSituation(ActionSearchPlugin):
 
     def get_category_actions(self, category_name):
         """获取分类下的动作列表"""
-        return self._load_json(f"memory/actions/category/{category_name}.json", [])
+        return self._load_json(f"memory/actions/categories/{category_name}.json", [])
 
     def get_action_data(self, category_name, action_id):
         """获取具体动作数据"""
@@ -34,5 +34,8 @@ class CognitiveCorePluginDefaultMorningSituation(ActionSearchPlugin):
             with open(file_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"动作查询加载json失败: {e}")
+            print(
+                f"""动作查询加载json失败: {e}
+路径: {file_path}"""
+            )
             return fallback

@@ -28,6 +28,7 @@ from lll_cognitive_core import (
     CognitiveCorePluginDefaultBehaviorExecutionOptions,
     CognitiveCorePluginDefaultMemoryExtraction,
     CognitiveCorePluginDefaultMemoryManager,
+    CognitiveCorePluginDefaultActionSearch,
 )
 
 from lll_simple_ai_shared import (
@@ -151,6 +152,11 @@ def main():
     cognitive_core.register_plugin(
         "associative_recall_filter",
         CognitiveCorePluginDefaultAssociativeRecallFilter(),
+    )
+
+    cognitive_core.register_plugin(
+        "action_search",
+        CognitiveCorePluginDefaultActionSearch(),
     )
 
     app.run(
