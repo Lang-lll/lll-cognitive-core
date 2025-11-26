@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 from ..config.create_openai_config import CreateOpenaiConfig
 from .generate_template_prompt import generate_template_prompt
-from .parse_jsonstr_to_models import parse_jsonstr_to_models
+from .parse_json_to_models import parse_jsonstr_to_models
 
 
 @dataclass
