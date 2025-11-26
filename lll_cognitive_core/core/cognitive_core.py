@@ -25,7 +25,7 @@ from .plugin_interfaces import (
     BehaviorExecutionPlugin,
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
-    ActionSearchPlugin,
+    ActionManagerPlugin,
 )
 from ..utils.debug_logger import DebugLogger
 
@@ -68,7 +68,7 @@ class CognitiveCore:
             "behavior_execution": None,
             "memory_extraction": None,
             "memory_manager": None,
-            "action_search": None,
+            "action_manager": None,
         }
 
         # 超过多少条历史记忆就使用专门的回想任务处理
@@ -301,8 +301,8 @@ class CognitiveCore:
     ) -> Optional[Dict[str, Any]]:
         """事件理解阶段"""
         plugin: EventUnderstandingPlugin = self.get_plugin("event_understanding")
-        action_search: ActionSearchPlugin = self.get_plugin("action_search")
-        if not plugin or not action_search:
+        action_manager: ActionManagerPlugin = self.get_plugin("action_manager")
+        if not plugin or not action_manager:
             return None
 
         input_data = UnderstandEventInput(
@@ -311,7 +311,7 @@ class CognitiveCore:
             # TODO: 过滤
             recent_events=self.working_memory.recent_events,
             active_goals=self.working_memory.active_goals,
-            action_categories=action_search.get_main_index(),
+            action_categories=action_manager.get_main_index(),
         )
 
         try:
@@ -358,9 +358,9 @@ class CognitiveCore:
     ):
         """生成和执行行为"""
         plugin: BehaviorGenerationPlugin = self.get_plugin("behavior_generation")
-        action_search: ActionSearchPlugin = self.get_plugin("action_search")
+        action_manager: ActionManagerPlugin = self.get_plugin("action_manager")
 
-        if not plugin or not action_search:
+        if not plugin or not action_manager:
             return
 
         try:
@@ -425,6 +425,14 @@ class CognitiveCore:
                     if result.current_situation:
                         self.working_memory.current_situation = result.current_situation
 
+            # 获取需要的动作列表
+            action_categorys: List[ActionCategoryModels] = []
+            for action_category in understood_data.action_categorys:
+                action_categorys = (
+                    action_categorys
+                    + action_manager.get_category_actions(action_category)
+                )
+
             cognitive_state = GenerateBehaviorInput(
                 current_situation=self.working_memory.current_situation,
                 main_events=understood_data.main_content,
@@ -432,7 +440,7 @@ class CognitiveCore:
                 episodic_memories=episodic_memories,
                 active_goals=self.working_memory.active_goals,
                 episodic_memories_text=episodic_memories_text,
-                action_data=action_search.get_category_actions(),
+                action_data=action_categorys,
                 social_norms=[],
             )
             behavior_plan: BehaviorPlan = plugin.generate_behavior(cognitive_state)
@@ -503,26 +511,40 @@ class CognitiveCore:
             # 这里应该通过Orchestrator发送到对应的AI模块
             for action in behavior_plan.plan:
                 self.logger.info(f"执行行为: {action}")
-                self._update_working_memory(
-                    UnderstandEventData(
-                        type=action.type,
-                        data=action.data,
-                        source="me",
-                        timestamp=time.time(),
-                    ),
-                    UnderstoodData(
-                        response_priority="medium",
-                        expected_response="none",
-                        main_content=action.data,
-                        current_situation=None,
-                        event_entity="me",
-                        key_entities=[],
-                        importance_score=50,
-                        memory_query_plan=None,
-                    ),
-                )
+                if action.type == "tts":
+                    self._update_working_memory(
+                        UnderstandEventData(
+                            type=action.type,
+                            data=action.data,
+                            source="me",
+                            timestamp=time.time(),
+                        ),
+                        UnderstoodData(
+                            response_priority="medium",
+                            expected_response="none",
+                            main_content=action.data,
+                            current_situation=None,
+                            event_entity="me",
+                            key_entities=[],
+                            importance_score=50,
+                            memory_query_plan=None,
+                        ),
+                    )
 
-                behavior_execution.execute_behavior_plan(action)
+                    behavior_execution.execute_behavior_plan(action)
+
+                elif action.type == "motion":
+                    action_manager: ActionManagerPlugin = self.get_plugin(
+                        "action_manager"
+                    )
+
+                    if action_manager:
+                        action_data = action_manager.get_action_data(
+                            action.action_category, action.action_id
+                        )
+
+                        print(f"action_data: {action_data}")
+
         except Exception as e:
             self.logger.error(f"执行行为计划: {e}")
 

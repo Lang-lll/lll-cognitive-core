@@ -6,6 +6,9 @@ from lll_simple_ai_shared import (
     BehaviorPlan,
     EpisodicMemoriesGenerateModels,
     EpisodicMemoriesModels,
+    ActionIndexModels,
+    ActionCategoryModels,
+    ActionDataModels,
 )
 from .data_structures import *
 
@@ -102,14 +105,14 @@ class AssociativeRecallFilterPlugin:
         return List[EpisodicMemoriesModels], False
 
 
-class ActionSearchPlugin:
+class ActionManagerPlugin:
     """动作库查询"""
 
-    def get_main_index(self):
-        return []
+    def get_main_index(self) -> List[ActionIndexModels]:
+        pass
 
-    def get_category_actions(self, category_name: str):
-        return []
+    def get_category_actions(self, category_name: str) -> List[ActionCategoryModels]:
+        pass
 
-    def get_action_data(self, category_name: str, action_id: str):
-        return []
+    def get_action_data(self, category_name: str, action_id: str) -> ActionDataModels:
+        pass

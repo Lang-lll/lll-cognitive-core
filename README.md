@@ -28,7 +28,7 @@ from lll_cognitive_core import (
     CognitiveCorePluginDefaultBehaviorExecutionOptions,
     CognitiveCorePluginDefaultMemoryExtraction,
     CognitiveCorePluginDefaultMemoryManager,
-    CognitiveCorePluginDefaultActionSearch,
+    CognitiveCorePluginDefaultActionManager,
 )
 
 from lll_simple_ai_shared import (
@@ -155,8 +155,8 @@ def main():
     )
 
     cognitive_core.register_plugin(
-        "action_search",
-        CognitiveCorePluginDefaultActionSearch(),
+        "action_manager",
+        CognitiveCorePluginDefaultActionManager(),
     )
 
     app.run(

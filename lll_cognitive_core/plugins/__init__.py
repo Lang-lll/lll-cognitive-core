@@ -23,8 +23,8 @@ from .cognitive_core_plugin_default_memory_extraction import (
 from .cognitive_core_plugin_default_memory_manager import (
     CognitiveCorePluginDefaultMemoryManager,
 )
-from .cognitive_core_plugin_default_action_search import (
-    CognitiveCorePluginDefaultActionSearch,
+from .cognitive_core_plugin_default_action_manager import (
+    CognitiveCorePluginDefaultActionManager,
 )
 
 __all__ = [
@@ -37,5 +37,5 @@ __all__ = [
     "CognitiveCorePluginDefaultBehaviorExecutionOptions",
     "CognitiveCorePluginDefaultMemoryExtraction",
     "CognitiveCorePluginDefaultMemoryManager",
-    "CognitiveCorePluginDefaultActionSearch",
+    "CognitiveCorePluginDefaultActionManager",
 ]
