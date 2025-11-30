@@ -3,7 +3,14 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from lll_simple_ai_shared import UnderstoodData, EpisodicMemoriesModels
+from openai import OpenAI
+from lll_simple_ai_shared import (
+    UnderstoodData,
+    EpisodicMemoriesModels,
+    ActionIndexModels,
+    ActionCategoryModels,
+)
+from ..config.create_openai_config import CreateOpenaiConfig
 
 
 class UnderstandEventData(BaseModel):
@@ -13,24 +20,35 @@ class UnderstandEventData(BaseModel):
     timestamp: datetime
 
 
+class MorningSituationInput(BaseModel):
+    episodic_memories: List["EpisodicMemoriesModels"]
+    query_too_many_results: bool
+
+
 class UnderstandEventInput(BaseModel):
+    current_situation: str
     understand_event: UnderstandEventData
     recent_events: List["CognitiveEvent"]
+    action_categories: List[ActionIndexModels]
     active_goals: List["Goal"]
 
 
 class AssociativeRecallInput(BaseModel):
     current_situation: str
+    main_events: str
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
+    query_too_many_results: bool
     active_goals: List["Goal"]
 
 
 class GenerateBehaviorInput(BaseModel):
     current_situation: str
+    main_events: str
     recent_events: List["CognitiveEvent"]
     episodic_memories: List["EpisodicMemoriesModels"]
     episodic_memories_text: str | None
+    action_data: List[ActionCategoryModels]
     active_goals: List["Goal"]
     social_norms: List[str]
 
@@ -46,14 +64,14 @@ class WorkingMemory:
     # 当前活跃信息
     current_situation: str  # 当前情境理解
     active_goals: List["Goal"]  # 活跃目标
-    attention_focus: Optional[str]  # 当前注意力焦点
+    # attention_focus: Optional[str]  # 当前注意力焦点
 
     # 短期事件缓存
     recent_events: List["CognitiveEvent"]  # 最近事件(循环队列，最大50个)
-    event_buffer: List["CognitiveEvent"]  # 待处理事件缓冲区
+    # event_buffer: List["CognitiveEvent"]  # 待处理事件缓冲区
 
     # 上下文状态
-    social_context: "SocialContext"  # 社交上下文
+    # social_context: "SocialContext"  # 社交上下文
 
     # 元信息
     cognitive_load: float  # 当前认知负荷 0-1
@@ -74,8 +92,8 @@ class CognitiveEvent:
     event_id: str  # 事件唯一ID
     timestamp: float  # 发生时间戳
     source: str  # 事件来源
-    event_type: str  # 事件类型
-    modality_type: str  # asr 语音识别输入 tts 语音输出 motor 动作执行 vision 图像识别 sensor 传感器数据 system 系统状态
+    # event_type: str  # 事件类型
+    modality_type: str  # asr 语音识别输入 tts 语音输出 motion 动作执行 vision 图像识别 sensor 传感器数据 system 系统状态
     raw_data: UnderstandEventData  # 原始数据
     understood_data: UnderstoodData  # 理解后的数据
     importance_score: float  # 重要性评分
@@ -104,9 +122,12 @@ class EmotionalState(Enum):
 
 
 class CoreStatus(Enum):
+    STIRRING = "stirring"
     AWAITING = "awaiting"
     AWARE = "aware"
+    PERCEIVING = "perceiving"
     WINDING_DOWN = "winding_down"
+    SLEEP = "sleep"
     DREAMING = "dreaming"
 
 
@@ -114,6 +135,7 @@ class CoreStatus(Enum):
 class EpisodicMemory:
     episodic_memories: Dict[str, EpisodicMemoriesModels]  # 记忆片段列表
     keyword_index: Dict[str, List[str]]  # 关键词索引
+    association_index: Dict[str, List[str]]  # 联想词索引
     time_index: Dict[str, List[str]]  # 时间索引
 
 
@@ -177,3 +199,10 @@ class Goal:
     success_criteria: List[str]  # 成功标准
     created_time: float
     deadline: Optional[float]  # 截止时间
+
+
+@dataclass
+class DefaultPluginInitOptions:
+    client: OpenAI
+    config: CreateOpenaiConfig
+    task_pre_messages: Optional[List[Dict[str, str]]] = None

@@ -1,28 +1,42 @@
 import time
 import threading
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Literal, Dict, Optional, Any
 from lll_simple_ai_shared import (
+    MorningSituationModels,
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
-    MemoryQueryType,
     EpisodicMemoriesModels,
     EpisodicMemoriesGenerateModels,
 )
 
 import queue
-import logging
 
 from ..config.cognitive_core_config import CognitiveCoreConfig
 from .cache_memory_manager import CacheMemoryManager
 from .data_structures import *
 from .plugin_interfaces import (
+    MorningSituationPlugin,
     EventUnderstandingPlugin,
     AssociativeRecallPlugin,
+    AssociativeRecallFilterPlugin,
     BehaviorGenerationPlugin,
+    BehaviorExecutionPlugin,
+    MemoryExtractionPlugin,
     MemoryManagerPlugin,
+    ActionManagerPlugin,
 )
+from ..utils.debug_logger import DebugLogger
+
+PluginType = Literal[
+    "event_understanding",
+    "associative_recall",
+    "behavior_generation",
+    "behavior_execution",
+    "memory_extraction",
+    "memory_manager",
+]
 
 
 class CognitiveCore:
@@ -33,17 +47,28 @@ class CognitiveCore:
 
     def __init__(self, config: CognitiveCoreConfig = None):
         # 运行时记忆
-        self.working_memory = WorkingMemory()
+        self.working_memory = WorkingMemory(
+            current_situation="",
+            active_goals=[],
+            recent_events=[],
+            cognitive_load=0,
+            last_update_time=time.time(),
+            active_duration=0,
+        )
 
         self.episodic_memory_manager = CacheMemoryManager()  # 活跃情景记忆缓存
 
         # 插件初始化
         self.plugins = {
+            "morning_situation": None,
             "event_understanding": None,
             "associative_recall": None,
+            "associative_recall_filter": None,
             "behavior_generation": None,
+            "behavior_execution": None,
             "memory_extraction": None,
             "memory_manager": None,
+            "action_manager": None,
         }
 
         # 超过多少条历史记忆就使用专门的回想任务处理
@@ -51,6 +76,11 @@ class CognitiveCore:
             config.episodic_memories_direct_threshold or 5
         )
         self.max_processed_count_on_loop = config.max_processed_count_on_loop or 10
+        self.max_associative_recall_items = config.max_associative_recall_items or 30
+        self.associative_recall_truncate_mode = (
+            config.associative_recall_truncate_mode or "last"
+        )
+        self.config = config or CognitiveCoreConfig()
 
         # 事件处理系统
         self.event_queue = queue.Queue()
@@ -62,13 +92,13 @@ class CognitiveCore:
             "events_processed": 0,
             "memory_consolidations": 0,
             "average_processing_time": 0.0,
-            "last_deep_consolidation": time.time(),
-            "last_light_consolidation": time.time(),
+            "last_deep_consolidation": 0,
+            "last_light_consolidation": 0,
         }
 
-        self.logger = logging.getLogger("CognitiveCore")
+        self.logger = DebugLogger(debug_mode=True)
 
-    def register_plugin(self, plugin_type: str, plugin_instance):
+    def register_plugin(self, plugin_type: PluginType, plugin_instance):
         """注册自定义插件"""
         if plugin_type in self.plugins:
             self.plugins[plugin_type] = plugin_instance
@@ -85,6 +115,67 @@ class CognitiveCore:
             return
 
         """启动认知核心"""
+        # 苏醒，生成情境记忆
+        self.status = CoreStatus.STIRRING
+        try:
+            morning_situation: MorningSituationPlugin = self.get_plugin(
+                "morning_situation"
+            )
+            memory_manager: MemoryManagerPlugin = self.get_plugin("memory_manager")
+            associative_recall_filter: AssociativeRecallFilterPlugin = self.get_plugin(
+                "associative_recall_filter"
+            )
+
+            if morning_situation and memory_manager and associative_recall_filter:
+                # 先获取最近有记忆的日期
+                recent_dates = memory_manager.get_recent_memory_days(
+                    max_days_back=self.config.morning_max_days_back,
+                    min_importance=self.config.morning_memory_min_importance,
+                    max_back_days=self.config.morning_max_back_days,
+                )
+                print(f"recent_dates: {recent_dates}")
+
+                date_range: List[str] = [0, 0]
+                if len(recent_dates) == 1:
+                    date_range = [recent_dates[0], recent_dates[0]]
+                elif len(recent_dates) > 1:
+                    date_range = [recent_dates[-1], recent_dates[0]]
+                print(f"date_range: {date_range}")
+
+                episodic_memories: List[EpisodicMemoriesModels] = (
+                    memory_manager.query_episodic_memories(
+                        date_range=date_range,
+                        keywords=[],
+                        query_strategy="semantic",
+                        importance_min=self.config.morning_memory_min_importance,
+                    )
+                )
+                # 如果查询结果过长，需要过滤
+                episodic_memories, was_truncated = (
+                    associative_recall_filter.episodic_memories_filter(
+                        episodic_memories=episodic_memories,
+                        limit=self.max_associative_recall_items,
+                        truncate_mode=self.associative_recall_truncate_mode,
+                    )
+                )
+                query_too_many_results = was_truncated
+                inputs = MorningSituationInput(
+                    episodic_memories=episodic_memories,
+                    query_too_many_results=query_too_many_results,
+                )
+                result: MorningSituationModels = (
+                    morning_situation.generate_morning_situation(inputs)
+                )
+
+                self.logger.debug(f"苏醒: {result}")
+
+                # episodic_memories存到缓存
+                if result.current_situation:
+                    self.working_memory.current_situation = result.current_situation
+        except Exception as e:
+            self.logger.error(f"加载近期记忆失败: {e}")
+
+        # 启动
         self.status = CoreStatus.AWARE
         self.processing_thread = threading.Thread(
             target=self._processing_loop, daemon=True
@@ -94,7 +185,7 @@ class CognitiveCore:
 
     def sleep(self):
         """停止认知核心"""
-        if self.status != CoreStatus.AWARE:
+        if self.status != CoreStatus.AWARE and self.status != CoreStatus.PERCEIVING:
             return
 
         self.status = CoreStatus.WINDING_DOWN
@@ -105,6 +196,7 @@ class CognitiveCore:
             raw_type = raw_event.get("type", "")
             raw_data = raw_event.get("data", "")
 
+            # TODO: 区分普通信息和紧急信息
             if self.status == CoreStatus.AWARE and raw_type and raw_data:
                 event_with_context = UnderstandEventData(
                     type=raw_type,
@@ -118,29 +210,38 @@ class CognitiveCore:
 
     def _processing_loop(self):
         """主处理循环"""
-        while self.status == CoreStatus.AWARE:
+        while self.status in [CoreStatus.AWARE, CoreStatus.WINDING_DOWN]:
             try:
+                if self.status == CoreStatus.AWARE:
+                    self.status = CoreStatus.PERCEIVING
+
                 # 处理事件队列
                 self._process_events()
 
                 # 更新系统状态
                 self._update_system_state()
 
-                # 检测是否进入睡眠
-                self._check_sleep()
+                # 恢复
+                if self.status == CoreStatus.PERCEIVING:
+                    self.status = CoreStatus.AWARE
 
-                time.sleep(0.02)  # 避免CPU过度占用
+                if self.status == CoreStatus.WINDING_DOWN:
+                    # 检测是否进入睡眠
+                    self._check_sleep()
+
+                time.sleep(0.05)  # 避免CPU过度占用
 
             except Exception as e:
                 self.logger.error(f"处理循环错误: {e}")
+
+                # 恢复
+                if self.status == CoreStatus.PERCEIVING:
+                    self.status = CoreStatus.AWARE
                 time.sleep(0.1)
 
     def _check_sleep(self):
-        if self.status == CoreStatus.WINDING_DOWN and self.event_queue.empty():
-
-            if self.processing_thread:
-                self.processing_thread.join(timeout=5.0)
-            self.logger.info("CognitiveCore 开始整理信息")
+        if self.status == CoreStatus.WINDING_DOWN:
+            self.stats == CoreStatus.SLEEP
 
             self._consolidate_memories("deep")
 
@@ -154,6 +255,7 @@ class CognitiveCore:
             and processed_count < self.max_processed_count_on_loop
         ):  # 每轮最多处理10个事件
             try:
+                # TODO: 多事件合并
                 event_data: UnderstandEventData = self.event_queue.get_nowait()
                 self._process_single_event(event_data)
                 processed_count += 1
@@ -183,15 +285,13 @@ class CognitiveCore:
                 return
 
             # 更新工作记忆
-            self._update_working_memory(event_data, understood_data)
+            cognitive_event = self._update_working_memory(event_data, understood_data)
 
             # 行为生成和执行
-            self._generate_and_execute_behavior(understood_data)
+            self._generate_and_execute_behavior(understood_data, cognitive_event)
 
             processing_time = time.time() - start_time
-            self.logger.debug(
-                f"事件处理完成: {understood_data.event_type}, 耗时: {processing_time:.3f}s"
-            )
+            self.logger.debug(f"事件处理完成, 耗时: {processing_time:.3f}s")
 
         except Exception as e:
             self.logger.error(f"处理事件失败: {e}")
@@ -201,17 +301,22 @@ class CognitiveCore:
     ) -> Optional[Dict[str, Any]]:
         """事件理解阶段"""
         plugin: EventUnderstandingPlugin = self.get_plugin("event_understanding")
-        if not plugin:
+        action_manager: ActionManagerPlugin = self.get_plugin("action_manager")
+        if not plugin or not action_manager:
             return None
 
         input_data = UnderstandEventInput(
+            current_situation=self.working_memory.current_situation,
             understand_event=event_data,
+            # TODO: 过滤
             recent_events=self.working_memory.recent_events,
             active_goals=self.working_memory.active_goals,
+            action_categories=action_manager.get_main_index(),
         )
 
         try:
             result = plugin.understand_event(input_data)
+            self.logger.debug(f"事件理解: {result}")
             return result
         except Exception as e:
             self.logger.error(f"事件理解插件错误: {e}")
@@ -219,7 +324,7 @@ class CognitiveCore:
 
     def _update_working_memory(
         self, event_data: UnderstandEventData, understood_data: UnderstoodData
-    ):
+    ) -> CognitiveEvent:
         """更新工作记忆"""
         # 创建认知事件
         cognitive_event = CognitiveEvent(
@@ -231,9 +336,6 @@ class CognitiveCore:
             understood_data=understood_data,
             importance_score=understood_data.importance_score or 0,
         )
-
-        # 添加到最近事件
-        self.working_memory.recent_events.append(cognitive_event)
 
         # 更新当前情境
         situation = understood_data.current_situation or None
@@ -249,11 +351,16 @@ class CognitiveCore:
             "session_start_time", time.time()
         )
 
-    def _generate_and_execute_behavior(self, understood_data: UnderstoodData):
+        return cognitive_event
+
+    def _generate_and_execute_behavior(
+        self, understood_data: UnderstoodData, cognitive_event: CognitiveEvent
+    ):
         """生成和执行行为"""
         plugin: BehaviorGenerationPlugin = self.get_plugin("behavior_generation")
+        action_manager: ActionManagerPlugin = self.get_plugin("action_manager")
 
-        if not plugin:
+        if not plugin or not action_manager:
             return
 
         try:
@@ -261,63 +368,105 @@ class CognitiveCore:
             memory_manager: MemoryManagerPlugin = self.get_plugin("memory_manager")
 
             if memory_manager and understood_data.memory_query_plan:
-                if (
-                    understood_data.memory_query_plan.query_type
-                    == MemoryQueryType.LONG_TERM_FRESH
-                ):
+                if understood_data.memory_query_plan.query_type == "long_term_fresh":
                     # 从文件获取
                     episodic_memories: List[EpisodicMemoriesModels] = (
                         memory_manager.query_episodic_memories(
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
+                            query_strategy=understood_data.memory_query_plan.query_strategy,
+                            importance_min=understood_data.memory_query_plan.importance_score_filter,
                         )
                     )
                     # 保存到缓存
                     self.episodic_memory_manager.save_episodic_memories(
                         episodic_memories
                     )
-                elif (
-                    understood_data.memory_query_plan.query_type
-                    == MemoryQueryType.LONG_TERM_CACHED
-                ):
+                elif understood_data.memory_query_plan.query_type == "long_term_cached":
                     # 从缓存获取
                     episodic_memories: List[EpisodicMemoriesModels] = (
                         self.episodic_memory_manager.query_episodic_memories(
                             date_range=understood_data.memory_query_plan.time_range,
                             keywords=understood_data.memory_query_plan.query_triggers,
+                            query_strategy=understood_data.memory_query_plan.query_strategy,
+                            importance_min=understood_data.memory_query_plan.importance_score_filter,
                         )
                     )
 
             # 获取联想回忆结果
             episodic_memories_text: str | None = None
             if len(episodic_memories) > self.episodic_memories_direct_threshold:
-                result = self._associative_recall(episodic_memories)
+                # 如果查询结果过长，需要过滤
+                associative_recall_filter: AssociativeRecallFilterPlugin = (
+                    self.get_plugin("associative_recall_filter")
+                )
+                query_too_many_results = True
+
+                if associative_recall_filter:
+                    episodic_memories, was_truncated = (
+                        associative_recall_filter.episodic_memories_filter(
+                            episodic_memories=episodic_memories,
+                            limit=self.max_associative_recall_items,
+                            truncate_mode=self.associative_recall_truncate_mode,
+                        )
+                    )
+                    query_too_many_results = was_truncated
+                else:
+                    # 没有过滤插件则清空列表
+                    episodic_memories = []
+
+                result = self._associative_recall(
+                    episodic_memories=episodic_memories,
+                    query_too_many_results=query_too_many_results,
+                    understood_data=understood_data,
+                )
                 if result:
                     episodic_memories_text = result.recalled_episode
                     if result.current_situation:
                         self.working_memory.current_situation = result.current_situation
 
+            # 获取需要的动作列表
+            action_categorys: List[ActionCategoryModels] = []
+            for action_category in understood_data.action_categorys:
+                action_categorys = (
+                    action_categorys
+                    + action_manager.get_category_actions(action_category)
+                )
+
             cognitive_state = GenerateBehaviorInput(
                 current_situation=self.working_memory.current_situation,
+                main_events=understood_data.main_content,
                 recent_events=self.working_memory.recent_events,
                 episodic_memories=episodic_memories,
                 active_goals=self.working_memory.active_goals,
                 episodic_memories_text=episodic_memories_text,
+                action_data=action_categorys,
                 social_norms=[],
             )
-
             behavior_plan: BehaviorPlan = plugin.generate_behavior(cognitive_state)
+
+            self.logger.debug(f"生成和执行行为: {behavior_plan}")
+
+            if not behavior_plan:
+                return
 
             # 更新情境
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
+
+            # 添加到最近事件
+            if cognitive_event:
+                self.working_memory.recent_events.append(cognitive_event)
 
             self._execute_behavior_plan(behavior_plan)
         except Exception as e:
             self.logger.error(f"行为生成插件错误: {e}")
 
     def _associative_recall(
-        self, episodic_memories: List["EpisodicMemoriesModels"]
+        self,
+        episodic_memories: List["EpisodicMemoriesModels"],
+        query_too_many_results: bool,
+        understood_data: UnderstoodData,
     ) -> RecallResultsModels | None:
         """联想回忆"""
         plugin: AssociativeRecallPlugin = self.get_plugin("associative_recall")
@@ -327,44 +476,85 @@ class CognitiveCore:
 
         recall_request = AssociativeRecallInput(
             current_situation=self.working_memory.current_situation,
+            main_events=understood_data.main_content,
             recent_events=self.working_memory.recent_events,
             episodic_memories=episodic_memories,
+            query_too_many_results=query_too_many_results,
             active_goals=self.working_memory.active_goals,
         )
-
+        result = plugin.associative_recall(recall_request)
+        self.logger.debug(f"联想回忆: {result}")
         try:
-            return plugin.associative_recall(recall_request)
+            return result
         except Exception as e:
             self.logger.error(f"联想回忆插件错误: {e}")
             return None
 
     def _execute_behavior_plan(self, behavior_plan: BehaviorPlan):
         """执行行为计划"""
-        if not behavior_plan or "plan" not in behavior_plan:
-            return
+        try:
+            if not behavior_plan or not behavior_plan.plan:
+                return
 
-        # 这里应该通过Orchestrator发送到对应的AI模块
-        for action in behavior_plan.plan:
-            self.logger.info(f"执行行为: {action}")
-            self._update_working_memory(
-                UnderstandEventData(
-                    type=action.type,
-                    data=action.data,
-                    source="me",
-                    timestamp=time.time(),
-                ),
-                UnderstoodData(
-                    event_type="my_action",
-                    confidence=1.0,
-                    response_priority="medium",
-                    expected_response="none",
-                    main_content=action.data,
-                    event_entity="me",
-                    key_entities=[],
-                    importance_score=50,
-                ),
+            behavior_execution: BehaviorExecutionPlugin = self.get_plugin(
+                "behavior_execution"
             )
-            # TODO: 通过HTTP发送到Orchestrator
+
+            if not behavior_execution:
+                return
+
+            if behavior_plan.current_situation and isinstance(
+                behavior_plan.current_situation, str
+            ):
+                self.working_memory.current_situation = behavior_plan.current_situation
+
+            # TODO: wait
+            # 这里应该通过Orchestrator发送到对应的AI模块
+            for action in behavior_plan.plan:
+                self.logger.info(f"执行行为: {action}")
+                if action.type == "tts":
+                    cognitive_event = self._update_working_memory(
+                        UnderstandEventData(
+                            type=action.type,
+                            data=action.data,
+                            source="me",
+                            timestamp=time.time(),
+                        ),
+                        UnderstoodData(
+                            response_priority="medium",
+                            expected_response="none",
+                            main_content=action.data,
+                            current_situation=None,
+                            event_entity="me",
+                            key_entities=[],
+                            importance_score=50,
+                            memory_query_plan=None,
+                        ),
+                    )
+
+                    # 添加到最近事件
+                    if cognitive_event:
+                        self.working_memory.recent_events.append(cognitive_event)
+
+                    behavior_execution.execute_tts_action(action)
+
+                elif action.type == "motion":
+                    action_manager: ActionManagerPlugin = self.get_plugin(
+                        "action_manager"
+                    )
+
+                    if action_manager:
+                        action_data = action_manager.get_action_data(
+                            action.action_category, action.action_id
+                        )
+
+                        if action_data:
+                            behavior_execution.execute_motion_action(
+                                action_data, action
+                            )
+
+        except Exception as e:
+            self.logger.error(f"执行行为计划: {e}")
 
     def _update_cognitive_load(self):
         """更新认知负荷"""
@@ -384,12 +574,13 @@ class CognitiveCore:
         self.status = CoreStatus.DREAMING
 
         # 获取记忆提取插件
-        extraction_plugin = self.get_plugin("memory_extraction")
+        extraction_plugin: MemoryExtractionPlugin = self.get_plugin("memory_extraction")
 
         if extraction_plugin is None:
             return
 
         try:
+            self.logger.info("CognitiveCore 开始整理信息")
             # 记忆提取阶段
             extraction_data = ExtractMemoriesInput(
                 current_situation=self.working_memory.current_situation,
@@ -397,9 +588,8 @@ class CognitiveCore:
                 active_goals=self.working_memory.active_goals,
             )
 
-            extraction_result: List[EpisodicMemoriesGenerateModels] = (
-                extraction_plugin.extract_memories(extraction_data)
-            )
+            extraction_result = extraction_plugin.extract_memories(extraction_data)
+            self.logger.debug(f"记忆提取: {extraction_result}")
 
             event_map: Dict[str, CognitiveEvent] = {}
             for event in self.working_memory.recent_events:
@@ -511,7 +701,7 @@ class CognitiveCore:
     def get_system_status(self) -> Dict[str, Any]:
         """获取系统状态"""
         return {
-            "status": self.status,
+            "status": self.status.value,
             "cognitive_load": self.working_memory.cognitive_load,
             "working_memory_usage": len(self.working_memory.recent_events),
             "episodic_memory_usage": len(

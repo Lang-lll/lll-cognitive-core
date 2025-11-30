@@ -1,18 +1,15 @@
-from openai import OpenAI
-
 from lll_simple_ai_shared import (
     RecallResultsModels,
+    associative_recall_system_template,
     associative_recall_task_format_inputs,
 )
-from ..config.create_openai_config import CreateOpenaiConfig
-from ..core.data_structures import AssociativeRecallInput
+from ..core.data_structures import DefaultPluginInitOptions, AssociativeRecallInput
 from ..utils.get_chat_response import GetChatResponseInput, get_chat_response
 
 
 class CognitiveCorePluginDefaultAssociativeRecall:
-    def __init__(self, client: OpenAI = None, config: CreateOpenaiConfig = None):
-        self._client = client
-        self._config = config
+    def __init__(self, options: DefaultPluginInitOptions):
+        self._options = options or DefaultPluginInitOptions()
 
     def associative_recall(
         self, raw_event: AssociativeRecallInput
@@ -20,10 +17,11 @@ class CognitiveCorePluginDefaultAssociativeRecall:
         # 回想
         return get_chat_response(
             GetChatResponseInput(
-                client=self._client,
-                config=self._config,
-                input_template="",
+                client=self._options.client,
+                config=self._options.config,
+                input_template=associative_recall_system_template,
                 format_inputs_func=associative_recall_task_format_inputs,
+                task_pre_messages=self._options.task_pre_messages,
                 inputs=raw_event,
                 data_model=RecallResultsModels,
             )

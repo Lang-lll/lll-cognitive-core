@@ -1,15 +1,25 @@
-from typing import Optional, List
+from typing import Optional, List, Literal, Tuple
 from lll_simple_ai_shared import (
+    MorningSituationModels,
     UnderstoodData,
     RecallResultsModels,
     BehaviorPlan,
     EpisodicMemoriesGenerateModels,
     EpisodicMemoriesModels,
+    ActionIndexModels,
+    ActionCategoryModels,
+    ActionDataModels,
 )
 from .data_structures import *
 
 
 # 默认插件实现基类
+class MorningSituationPlugin:
+    def generate_morning_situation(self, data: MorningSituationInput) -> Dict:
+        # 生成睡醒情境认知
+        return MorningSituationModels
+
+
 class EventUnderstandingPlugin:
     def understand_event(self, raw_event: UnderstandEventInput) -> Dict:
         # 事件理解
@@ -26,10 +36,21 @@ class BehaviorGenerationPlugin:
         return BehaviorPlan
 
 
+class BehaviorExecutionPlugin:
+
+    def execute_tts_action(self, action: Any):
+        pass
+
+    def execute_motion_action(self, action: ActionDataModels, options: Any):
+        pass
+
+
 class MemoryExtractionPlugin:
     """记忆提取插件基类 - 只定义与CognitiveCore交互的接口"""
 
-    def extract_memories(self, data: ExtractMemoriesInput) -> Dict:
+    def extract_memories(
+        self, data: ExtractMemoriesInput
+    ) -> List[EpisodicMemoriesGenerateModels]:
         """从工作记忆中提取结构化记忆 - 核心接口方法"""
         return List[EpisodicMemoriesGenerateModels]
 
@@ -52,10 +73,11 @@ class MemoryManagerPlugin:
 
     def query_episodic_memories(
         self,
-        date_range: Optional[List[str]],
+        date_range: Optional[List[int | str]],
         importance_min: Optional[int],
         keywords: Optional[List[str]],
         associations: Optional[List[str]],
+        query_strategy: Literal["semantic", "keyword"],
     ) -> List[EpisodicMemoriesModels]:
         """
         从存储加载情景记忆
@@ -67,3 +89,36 @@ class MemoryManagerPlugin:
             associations: 联想词
         """
         raise NotImplementedError("子类必须实现query_episodic_memories方法")
+
+    def get_recent_memory_days(
+        self, max_days_back=3, min_importance=0, max_back_days=1
+    ) -> List[str]:
+        """获取有记忆的最近N天"""
+        pass
+
+
+class AssociativeRecallFilterPlugin:
+    """联想信息过滤"""
+
+    def episodic_memories_filter(
+        self,
+        episodic_memories: List[EpisodicMemoriesModels],
+        limit: int,
+        truncate_mode: Literal["first", "last"] = "last",
+    ) -> Tuple[List[EpisodicMemoriesModels], bool]:
+        return List[EpisodicMemoriesModels], False
+
+
+class ActionManagerPlugin:
+    """动作库查询"""
+
+    def get_main_index(self) -> List[ActionIndexModels]:
+        pass
+
+    def get_category_actions(self, category_name: str) -> List[ActionCategoryModels]:
+        pass
+
+    def get_action_data(
+        self, category_name: str, action_id: str
+    ) -> ActionDataModels | None:
+        pass
