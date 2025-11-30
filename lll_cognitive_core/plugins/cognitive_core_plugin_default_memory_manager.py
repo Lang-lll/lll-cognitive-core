@@ -34,27 +34,8 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                 # if meta["importance_range"][1] < importance_min:
                 #     continue
 
-                # 策略1: semantic - 不进行关键词预过滤，加载所有相关日期的数据
-                if query_strategy == "semantic":
-                    relevant_dates.append(date_str)
-                    continue
-
-                # 策略2: keyword - 进行关键词预过滤
-                elif query_strategy == "keyword" and keywords:
-                    # 关键词预过滤（宽松匹配，避免过度过滤）
-                    keyword_match = any(
-                        kw in meta.get("keywords", []) for kw in keywords
-                    )
-                    # 联想词预过滤
-                    association_match = any(
-                        assoc in meta.get("associations", []) for assoc in keywords
-                    )
-
-                    if keyword_match or association_match:
-                        relevant_dates.append(date_str)
-                else:
-                    # 没有关键词的keyword策略，加载所有相关日期
-                    relevant_dates.append(date_str)
+                # 加载相关日期
+                relevant_dates.append(date_str)
 
             # 加载相关日期的文件进行精细筛选
             results: List[EpisodicMemoriesModels] = []
@@ -98,6 +79,9 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         """
         if not episodic_memories:
             return
+
+        # 按时间戳排序，时间越早的排在前面
+        episodic_memories.sort(key=lambda x: x.timestamp)
 
         # 按日期分组记忆
         memories_by_date = self.group_memories_by_date(episodic_memories)
@@ -206,8 +190,6 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
         if date_str not in time_index["indexed_dates"]:
             time_index["indexed_dates"][date_str] = {
                 "memory_count": 0,
-                "keywords": set(),
-                "associations": set(),
             }
 
         date_meta = time_index["indexed_dates"][date_str]
@@ -220,18 +202,12 @@ class CognitiveCorePluginDefaultMemoryManager(MemoryManagerPlugin):
                     if keyword not in keyword_index:
                         keyword_index[keyword] = set()
                     keyword_index[keyword].add(memory.id)
-                    date_meta["keywords"].add(keyword)
 
             if memory.associations is not None:
                 for association in memory.associations:
                     if association not in association_index:
                         association_index[association] = set()
                     association_index[association].add(memory.id)
-                    date_meta["associations"].add(association)
-
-        # 转换set为list以便JSON序列化
-        date_meta["keywords"] = list(date_meta["keywords"])
-        date_meta["associations"] = list(date_meta["associations"])
 
     def merge_memories(
         self, existing: List[EpisodicMemoriesModels], new: List[EpisodicMemoriesModels]

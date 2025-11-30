@@ -33,11 +33,11 @@ class CognitiveCorePluginDefaultActionManager(ActionManagerPlugin):
             List[ActionCategoryModels],
         )
 
-    def get_action_data(self, category_name, action_id) -> ActionDataModels:
+    def get_action_data(self, category_name, action_id) -> ActionDataModels | None:
         """获取具体动作数据"""
         return parse_json_to_models(
             self._load_json_str(
-                f"memory/action/data/{category_name}/{action_id}.json", {}
+                f"memory/action/data/{category_name}/{action_id}.json", None
             ),
             ActionDataModels,
         )

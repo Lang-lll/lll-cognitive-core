@@ -508,11 +508,12 @@ class CognitiveCore:
             ):
                 self.working_memory.current_situation = behavior_plan.current_situation
 
+            # TODO: wait
             # 这里应该通过Orchestrator发送到对应的AI模块
             for action in behavior_plan.plan:
                 self.logger.info(f"执行行为: {action}")
                 if action.type == "tts":
-                    self._update_working_memory(
+                    cognitive_event = self._update_working_memory(
                         UnderstandEventData(
                             type=action.type,
                             data=action.data,
@@ -531,7 +532,11 @@ class CognitiveCore:
                         ),
                     )
 
-                    behavior_execution.execute_behavior_plan(action)
+                    # 添加到最近事件
+                    if cognitive_event:
+                        self.working_memory.recent_events.append(cognitive_event)
+
+                    behavior_execution.execute_tts_action(action)
 
                 elif action.type == "motion":
                     action_manager: ActionManagerPlugin = self.get_plugin(
@@ -543,7 +548,10 @@ class CognitiveCore:
                             action.action_category, action.action_id
                         )
 
-                        print(f"action_data: {action_data}")
+                        if action_data:
+                            behavior_execution.execute_motion_action(
+                                action_data, action
+                            )
 
         except Exception as e:
             self.logger.error(f"执行行为计划: {e}")

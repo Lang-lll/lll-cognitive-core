@@ -23,29 +23,11 @@ class CognitiveCorePluginDefaultBehaviorExecution(BehaviorExecutionPlugin):
     def __init__(self, options: CognitiveCorePluginDefaultBehaviorExecutionOptions):
         self._options = options or CognitiveCorePluginDefaultBehaviorExecutionOptions()
 
-    def execute_behavior_plan(self, action: Any):
-        """
-        执行行为计划，向指定地址发送action数据
-
-        Args:
-            action: 要发送的行为数据，可以是BaseModel、Dict或任何可JSON序列化的对象
-        """
+    def execute_tts_action(self, action):
         try:
-            # 构建完整的URL
             url = self._options.url
+            json_data = action.model_dump()
 
-            # 统一处理数据序列化
-            if isinstance(action, BaseModel):
-                # 如果是BaseModel，使用model_dump()
-                json_data = action.model_dump()
-            elif isinstance(action, dict):
-                # 如果是字典，直接使用
-                json_data = action
-            else:
-                # 其他类型，尝试直接序列化
-                json_data = action
-
-            # 发送POST请求
             response = requests.post(
                 url,
                 json=json_data,
@@ -55,8 +37,28 @@ class CognitiveCorePluginDefaultBehaviorExecution(BehaviorExecutionPlugin):
 
             response.raise_for_status()
             return response.json()
+        except Exception as e:
+            print(f"""tts任务发送失败: {e}""")
 
-        except requests.exceptions.RequestException as e:
-            print(f"请求失败: {e}")
-        except json.JSONEncoder as e:
-            print(f"JSON序列化失败: {e}")
+    def execute_motion_action(self, action, options):
+
+        try:
+            url = self._options.url
+            action_data = action.model_dump()
+
+            response = requests.post(
+                url,
+                json={
+                    "type": options.type,
+                    "speed": options.speed,
+                    "intensity": options.intensity,
+                    "action_data": action_data,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"""motion任务发送失败: {e}""")

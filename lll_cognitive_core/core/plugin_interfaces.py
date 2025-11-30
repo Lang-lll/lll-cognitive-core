@@ -37,7 +37,11 @@ class BehaviorGenerationPlugin:
 
 
 class BehaviorExecutionPlugin:
-    def execute_behavior_plan(self, action: Any):
+
+    def execute_tts_action(self, action: Any):
+        pass
+
+    def execute_motion_action(self, action: ActionDataModels, options: Any):
         pass
 
 
@@ -114,5 +118,7 @@ class ActionManagerPlugin:
     def get_category_actions(self, category_name: str) -> List[ActionCategoryModels]:
         pass
 
-    def get_action_data(self, category_name: str, action_id: str) -> ActionDataModels:
+    def get_action_data(
+        self, category_name: str, action_id: str
+    ) -> ActionDataModels | None:
         pass
