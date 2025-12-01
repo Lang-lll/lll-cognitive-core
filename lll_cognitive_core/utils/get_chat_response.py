@@ -42,6 +42,7 @@ def get_chat_response(data: GetChatResponseInput):
                 messages=all_messages,
                 response_format={"type": "json_object"},
                 timeout=data.config.timeout,
+                temperature=data.config.temperature,
             )
 
             return parse_jsonstr_to_models(
