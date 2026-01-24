@@ -24,8 +24,8 @@ from lll_cognitive_core import (
     CognitiveCorePluginDefaultAssociativeRecall,
     CognitiveCorePluginDefaultAssociativeRecallFilter,
     CognitiveCorePluginDefaultBehaviorGeneration,
-    CognitiveCorePluginDefaultBehaviorExecution,
-    CognitiveCorePluginDefaultBehaviorExecutionOptions,
+    CognitiveCorePluginDefaultCommunication,
+    CognitiveCorePluginDefaultCommunicationOptions,
     CognitiveCorePluginDefaultMemoryExtraction,
     CognitiveCorePluginDefaultMemoryManager,
     CognitiveCorePluginDefaultActionManager,
@@ -120,10 +120,10 @@ def main():
     )
 
     cognitive_core.register_plugin(
-        "behavior_execution",
-        CognitiveCorePluginDefaultBehaviorExecution(
-            CognitiveCorePluginDefaultBehaviorExecutionOptions(
-                protocol="http", host="127.0.0.1", port=80, path="/webhook"
+        "communication",
+        CognitiveCorePluginDefaultCommunication(
+            CognitiveCorePluginDefaultCommunicationOptions(
+                protocol="http", host="127.0.0.1", port=3000, path="/webhook"
             ),
         ),
     )
@@ -161,6 +161,6 @@ def main():
 
     app.run(
         host="0.0.0.0",
-        port=9000,
+        port=9101,
     )
 ```

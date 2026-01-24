@@ -37,11 +37,36 @@ class BehaviorGenerationPlugin:
 
 
 class BehaviorExecutionPlugin:
+    def receive_registered(self):
+        pass
+
+    def receive_heartbeat(self):
+        pass
+
+    def publish_status(self, status: str):
+        pass
 
     def execute_tts_action(self, action: Any):
         pass
 
     def execute_motion_action(self, action: ActionDataModels, options: Any):
+        pass
+
+    def execute_wait_action(self, action: Any):
+        pass
+
+
+class CommunicationPlugin:
+    def send_message(self, data: Dict) -> bool:
+        """
+        发送消息
+
+        出参: 是否发送成功
+        """
+        pass
+
+    def receive_messages(self, message: Dict):
+        """接收待处理的消息"""
         pass
 
 

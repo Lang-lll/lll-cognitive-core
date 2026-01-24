@@ -22,7 +22,7 @@ from .plugin_interfaces import (
     AssociativeRecallPlugin,
     AssociativeRecallFilterPlugin,
     BehaviorGenerationPlugin,
-    BehaviorExecutionPlugin,
+    CommunicationPlugin,
     MemoryExtractionPlugin,
     MemoryManagerPlugin,
     ActionManagerPlugin,
@@ -33,7 +33,7 @@ PluginType = Literal[
     "event_understanding",
     "associative_recall",
     "behavior_generation",
-    "behavior_execution",
+    "communication",
     "memory_extraction",
     "memory_manager",
 ]
@@ -65,7 +65,7 @@ class CognitiveCore:
             "associative_recall": None,
             "associative_recall_filter": None,
             "behavior_generation": None,
-            "behavior_execution": None,
+            "communication": None,
             "memory_extraction": None,
             "memory_manager": None,
             "action_manager": None,
@@ -98,6 +98,9 @@ class CognitiveCore:
 
         self.logger = DebugLogger(debug_mode=True)
 
+        # 首次启动发送通知
+        self._set_status(CoreStatus.AWAITING)
+
     def register_plugin(self, plugin_type: PluginType, plugin_instance):
         """注册自定义插件"""
         if plugin_type in self.plugins:
@@ -116,7 +119,7 @@ class CognitiveCore:
 
         """启动认知核心"""
         # 苏醒，生成情境记忆
-        self.status = CoreStatus.STIRRING
+        self._set_status(CoreStatus.STIRRING)
         try:
             morning_situation: MorningSituationPlugin = self.get_plugin(
                 "morning_situation"
@@ -172,11 +175,29 @@ class CognitiveCore:
                 # episodic_memories存到缓存
                 if result.current_situation:
                     self.working_memory.current_situation = result.current_situation
+
+                    communication: CommunicationPlugin = self.get_plugin(
+                        "communication"
+                    )
+
+                    if not communication:
+                        return
+
+                    # TODO: 统一为想法
+                    communication.send_message(
+                        {
+                            "type": "action",
+                            "message": {
+                                "type": "morning",
+                                "data": result.current_situation,
+                            },
+                        }
+                    )
         except Exception as e:
             self.logger.error(f"加载近期记忆失败: {e}")
 
         # 启动
-        self.status = CoreStatus.AWARE
+        self._set_status(CoreStatus.AWARE)
         self.processing_thread = threading.Thread(
             target=self._processing_loop, daemon=True
         )
@@ -188,7 +209,7 @@ class CognitiveCore:
         if self.status != CoreStatus.AWARE and self.status != CoreStatus.PERCEIVING:
             return
 
-        self.status = CoreStatus.WINDING_DOWN
+        self._set_status(CoreStatus.WINDING_DOWN)
 
     def receive_event(self, raw_event: Dict[str, str]):
         """接收事件"""
@@ -213,7 +234,8 @@ class CognitiveCore:
         while self.status in [CoreStatus.AWARE, CoreStatus.WINDING_DOWN]:
             try:
                 if self.status == CoreStatus.AWARE:
-                    self.status = CoreStatus.PERCEIVING
+                    # TODO: 区分有任务和无任务
+                    self._set_status(CoreStatus.PERCEIVING, False)
 
                 # 处理事件队列
                 self._process_events()
@@ -223,9 +245,8 @@ class CognitiveCore:
 
                 # 恢复
                 if self.status == CoreStatus.PERCEIVING:
-                    self.status = CoreStatus.AWARE
-
-                if self.status == CoreStatus.WINDING_DOWN:
+                    self._set_status(CoreStatus.AWARE, False)
+                elif self.status == CoreStatus.WINDING_DOWN:
                     # 检测是否进入睡眠
                     self._check_sleep()
 
@@ -236,7 +257,7 @@ class CognitiveCore:
 
                 # 恢复
                 if self.status == CoreStatus.PERCEIVING:
-                    self.status = CoreStatus.AWARE
+                    self._set_status(CoreStatus.AWARE, False)
                 time.sleep(0.1)
 
     def _check_sleep(self):
@@ -496,11 +517,9 @@ class CognitiveCore:
             if not behavior_plan or not behavior_plan.plan:
                 return
 
-            behavior_execution: BehaviorExecutionPlugin = self.get_plugin(
-                "behavior_execution"
-            )
+            communication: CommunicationPlugin = self.get_plugin("communication")
 
-            if not behavior_execution:
+            if not communication:
                 return
 
             if behavior_plan.current_situation and isinstance(
@@ -536,7 +555,9 @@ class CognitiveCore:
                     if cognitive_event:
                         self.working_memory.recent_events.append(cognitive_event)
 
-                    behavior_execution.execute_tts_action(action)
+                    communication.send_message(
+                        {"type": "action", "message": {"action": action.model_dump()}}
+                    )
 
                 elif action.type == "motion":
                     action_manager: ActionManagerPlugin = self.get_plugin(
@@ -549,9 +570,24 @@ class CognitiveCore:
                         )
 
                         if action_data:
-                            behavior_execution.execute_motion_action(
-                                action_data, action
+                            communication.send_message(
+                                {
+                                    "type": "action",
+                                    "message": {
+                                        "type": action.type,
+                                        "action_id": action.action_id,
+                                        "speed": action.speed,
+                                        "intensity": action.intensity,
+                                        "action_data": action_data,
+                                    },
+                                }
                             )
+
+                elif action.type == "wait":
+                    communication.send_message(
+                        {"type": "action", "message": {"action": action.model_dump()}}
+                    )
+                    time.sleep(action.duration)
 
         except Exception as e:
             self.logger.error(f"执行行为计划: {e}")
@@ -571,7 +607,7 @@ class CognitiveCore:
 
     def _consolidate_memories(self, consolidation_type: str):
         """执行记忆整理"""
-        self.status = CoreStatus.DREAMING
+        self._set_status(CoreStatus.DREAMING)
 
         # 获取记忆提取插件
         extraction_plugin: MemoryExtractionPlugin = self.get_plugin("memory_extraction")
@@ -632,7 +668,7 @@ class CognitiveCore:
 
             self._apply_consolidation_result(consolidation_type)
 
-            self.status = CoreStatus.AWAITING
+            self._set_status(CoreStatus.AWAITING)
 
             # 更新整理时间
             if consolidation_type == "deep":
@@ -697,6 +733,25 @@ class CognitiveCore:
         if current_time - self.stats.get("last_cleanup_time", 0) > 60:
             self._cleanup_expired_memories()
             self.stats["last_cleanup_time"] = current_time"""
+
+    def _set_status(self, new_status: CoreStatus, publish: bool = True):
+        self.status = new_status
+
+        if publish:
+            self.publish_status()
+
+    def publish_status(self):
+        communication: CommunicationPlugin = self.get_plugin("communication")
+
+        if not communication:
+            return
+
+        communication.send_message(
+            {
+                "type": "publish_status",
+                "message": {"type": "publish_status", "status": self.status.value},
+            }
+        )
 
     def get_system_status(self) -> Dict[str, Any]:
         """获取系统状态"""

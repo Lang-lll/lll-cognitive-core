@@ -13,9 +13,9 @@ from .cognitive_core_plugin_default_associative_recall_filter import (
 from .cognitive_core_plugin_default_behavior_generation import (
     CognitiveCorePluginDefaultBehaviorGeneration,
 )
-from .cognitive_core_plugin_default_behavior_execution import (
-    CognitiveCorePluginDefaultBehaviorExecution,
-    CognitiveCorePluginDefaultBehaviorExecutionOptions,
+from .cognitive_core_plugin_default_communication import (
+    CognitiveCorePluginDefaultCommunication,
+    CognitiveCorePluginDefaultCommunicationOptions,
 )
 from .cognitive_core_plugin_default_memory_extraction import (
     CognitiveCorePluginDefaultMemoryExtraction,
@@ -33,8 +33,8 @@ __all__ = [
     "CognitiveCorePluginDefaultAssociativeRecall",
     "CognitiveCorePluginDefaultAssociativeRecallFilter",
     "CognitiveCorePluginDefaultBehaviorGeneration",
-    "CognitiveCorePluginDefaultBehaviorExecution",
-    "CognitiveCorePluginDefaultBehaviorExecutionOptions",
+    "CognitiveCorePluginDefaultCommunication",
+    "CognitiveCorePluginDefaultCommunicationOptions",
     "CognitiveCorePluginDefaultMemoryExtraction",
     "CognitiveCorePluginDefaultMemoryManager",
     "CognitiveCorePluginDefaultActionManager",
