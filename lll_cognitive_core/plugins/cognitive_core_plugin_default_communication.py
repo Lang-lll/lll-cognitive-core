@@ -50,13 +50,13 @@ class CognitiveCorePluginDefaultCommunication(CommunicationPlugin):
         url = self._options.url
 
         try:
-            if type == "action" or type == "publish_status":
+            if type == "action" or type == "thinking" or type == "publish_status":
                 response = requests.post(
                     url,
                     json={
                         "type": "publish",
                         "to_plugin": ["humanoid_server"],
-                        "message": data.get("message"),
+                        "message": data,
                     },
                     headers={"Content-Type": "application/json"},
                     timeout=20,

@@ -176,21 +176,10 @@ class CognitiveCore:
                 if result.current_situation:
                     self.working_memory.current_situation = result.current_situation
 
-                    communication: CommunicationPlugin = self.get_plugin(
-                        "communication"
-                    )
-
-                    if not communication:
-                        return
-
-                    # TODO: 统一为想法
-                    communication.send_message(
+                    self._send_thinking_message(
                         {
-                            "type": "action",
-                            "message": {
-                                "type": "morning",
-                                "data": result.current_situation,
-                            },
+                            "type": "morning",
+                            "text": result.current_situation,
                         }
                     )
         except Exception as e:
@@ -362,6 +351,12 @@ class CognitiveCore:
         situation = understood_data.current_situation or None
         if situation is not None:
             self.working_memory.current_situation = situation
+            self._send_thinking_message(
+                {
+                    "type": "understand",
+                    "text": situation,
+                }
+            )
 
         # 更新认知负荷
         self._update_cognitive_load()
@@ -445,6 +440,12 @@ class CognitiveCore:
                     episodic_memories_text = result.recalled_episode
                     if result.current_situation:
                         self.working_memory.current_situation = result.current_situation
+                        self._send_thinking_message(
+                            {
+                                "type": "recalled",
+                                "text": result.current_situation,
+                            }
+                        )
 
             # 获取需要的动作列表
             action_categorys: List[ActionCategoryModels] = []
@@ -474,6 +475,12 @@ class CognitiveCore:
             # 更新情境
             if behavior_plan.current_situation:
                 self.working_memory.current_situation = behavior_plan.current_situation
+                self._send_thinking_message(
+                    {
+                        "type": "behavior",
+                        "text": behavior_plan.current_situation,
+                    }
+                )
 
             # 添加到最近事件
             if cognitive_event:
@@ -522,12 +529,12 @@ class CognitiveCore:
             if not communication:
                 return
 
+            # 多余的赋值？
             if behavior_plan.current_situation and isinstance(
                 behavior_plan.current_situation, str
             ):
                 self.working_memory.current_situation = behavior_plan.current_situation
 
-            # TODO: wait
             # 这里应该通过Orchestrator发送到对应的AI模块
             for action in behavior_plan.plan:
                 self.logger.info(f"执行行为: {action}")
@@ -556,7 +563,7 @@ class CognitiveCore:
                         self.working_memory.recent_events.append(cognitive_event)
 
                     communication.send_message(
-                        {"type": "action", "message": {"action": action.model_dump()}}
+                        {"type": "action", "data": action.model_dump()}
                     )
 
                 elif action.type == "motion":
@@ -573,19 +580,19 @@ class CognitiveCore:
                             communication.send_message(
                                 {
                                     "type": "action",
-                                    "message": {
+                                    "data": {
                                         "type": action.type,
                                         "action_id": action.action_id,
                                         "speed": action.speed,
                                         "intensity": action.intensity,
-                                        "action_data": action_data,
+                                        "action_data": action_data.model_dump(),
                                     },
                                 }
                             )
 
                 elif action.type == "wait":
                     communication.send_message(
-                        {"type": "action", "message": {"action": action.model_dump()}}
+                        {"type": "action", "data": action.model_dump()}
                     )
                     time.sleep(action.duration)
 
@@ -665,6 +672,7 @@ class CognitiveCore:
             if memory_manager:
                 # 保存到文件
                 memory_manager.save_episodic_memories(result)
+                # TODO: 发送结果
 
             self._apply_consolidation_result(consolidation_type)
 
@@ -734,6 +742,14 @@ class CognitiveCore:
             self._cleanup_expired_memories()
             self.stats["last_cleanup_time"] = current_time"""
 
+    def _send_thinking_message(self, message: Dict[str, Any]):
+        communication: CommunicationPlugin = self.get_plugin("communication")
+
+        if not communication:
+            return
+
+        communication.send_message({"type": "thinking", "data": message})
+
     def _set_status(self, new_status: CoreStatus, publish: bool = True):
         self.status = new_status
 
@@ -749,7 +765,7 @@ class CognitiveCore:
         communication.send_message(
             {
                 "type": "publish_status",
-                "message": {"type": "publish_status", "status": self.status.value},
+                "data": {"status": self.status.value},
             }
         )
 
